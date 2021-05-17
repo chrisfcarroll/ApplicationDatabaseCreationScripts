@@ -1,4 +1,11 @@
 #! /usr/bin/env pwsh
+
+<#
+  .SYNOPSIS
+  Update Postgres template1 —the default template database— to your preferred Locale settings.
+
+#>
+
 Param(
   $dbLocale,
   $postgresHost="localhost",

@@ -1,4 +1,5 @@
 #! /usr/bin/env pwsh
+
 <#
   .SYNOPSIS
   Create a Postgres application database and roles for owner, application, and application_readonly
