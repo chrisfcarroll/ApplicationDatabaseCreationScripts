@@ -24,34 +24,47 @@
   For Scram encryption (requires python3): https://gist.github.com/chrisfcarroll/4c819af67ec5485ed0d6aef7863562a4
 #>
 
-Param(
-  $databaseName="APPNAME",
-  $postgresHost="localhost",
-  [string]$databaseOwner,
-  $appAccount,
-  [string]$appAccountPassword,
-  $readonlyAppAccount,
-  [string]$readonlyAppAccountPassword,
-  $dbEncoding='UTF-8',
-  $dbLocale,
-  [switch]$createViewAndDropConnectionFunctions,
-  [switch]$addPlv8,
-  [switch]$addTrigram,
-  [bool]$addUUID=$true,
-  [string]$adminUser=[Environment]::UserName,
-  [switch]$dryRun,
-  [switch]$down
-)
 
-function defaultLocaleForLocalhost{
-  $nixenUK='en_GB'
-  $windowsenUK="English_United Kingdom"
-  $nixenUS="en_US"
-  $windowsenUS="English_United States"
-  $lc= if($IsWindows){$windowsenUK}else{$nixenUK}
-  return $lc
-}
-if(-not $dbLocale){$dbLocale= defaultLocaleForLocalhost}
+Param(
+  ##A name for the new database
+  [string]$databaseName="appname",
+  ##The postgres Host you wish to target
+  [string][Alias('H')]$postgresHost="localhost",
+  ##The postgres username to login with to run this script. Defaults to the OS username running this script.
+  [string][Alias('U')]$adminUser=[Environment]::UserName,
+  ##The name of the Role to create to own the new database
+  [string]$databaseOwner,
+  ##The name of the Role to Create having read & write access to the new database
+  [string]$appAccount,
+  ##The password to use for -appAccount. If not is given, one will be generated and displayed as the
+  ##first line of output of this script.
+  [string]$appAccountPassword,
+  ##The name of the Role to Create having read access to the new database
+  [string]$readonlyAppAccount,
+  ##The password to use for -appAccount. If not is given, one will be generated and displayed as the
+  ##second or first line of output of this script.
+  [string]$readonlyAppAccountPassword,
+  ##The encoding to set. Leave this at UTF-8 for simple worldwide compatibility
+  [string]$dbEncoding='UTF-8',
+  ##the Locale you choose must be supported by the Operating System that the postgres instance is running on.
+  [string]$dbLocale,
+  ##If set the extension uuid-ossp will be added, to add uuid functions to the database
+  [bool]$addUUID=$true,
+  ##If set, Functions called ps and DropConnections will be create to view and drop database connections
+  [switch]$addFunctionsForPSAndDropConnections,
+  ##If set the extension plv8 will be added, for javascript stored function support.
+  [switch]$addPlv8,
+  ##If set the extension trgm will be added, for trigram and text-search support.
+  [switch]$addTrigram,
+  ##If set, the SQL scripts will be echoed but not run
+  [switch]$dryRun,
+  ##Shows help and returns
+  [switch]$help,
+  ##Show available locales on this machine, and returns
+  [switch]$helpAvailableLocales,
+  ## Delete the Database and the associated Roles
+  [switch][Alias("Down")]$deleteDatabaseAndRoles
+)
 
 function runOrDryRun($command, $db, [switch]$onErrorStop){
   if($dryRun){ "-d $db :  $command" }
@@ -61,6 +74,27 @@ function runOrDryRun($command, $db, [switch]$onErrorStop){
     return $?
   }
 }
+function defaultLocaleForLocalhost{
+  $lc= if($IsWindows){ 
+    (Get-UICulture).Name
+  }else{
+     $(locale | grep LC_COLLATE | sed 's/LC_COLLATE=\"//' | sed 's/\"//') 
+  }
+  return $lc
+}
+if(-not $dbLocale)
+{
+  $dbLocale=defaultLocaleForLocalhost
+  "Detected localhost locale as $dbLocale."
+  if($postgresHost -ne 'localhost' -and $postgresHost -ne '127.0.0.1'){
+    throw "When connecting to a remote server, you must specify the locale. It can only be auto-detected on localhost."
+  }
+}
+
+function help{ Get-Help $PSCommandPath ; Get-Help $PSCommandPath -Parameter '*' }
+if($help){help; Exit}
+function helpAvailableLocales{ [CultureInfo]::GetCultures( [CultureTypes]::AllCultures ) }
+if($helpAvailableLocales){helpAvailableLocales; Exit}
 
 function sanitiseAndValidateParametersElseForceDryRun{
 
@@ -129,7 +163,7 @@ You did not provide passwords, so passwords were created and shown above this li
     add UUID extension: $addUUID
     add Trigram extension: $addTrigram
     add plv8 extension: $addPlv8
-    Create Functions for View and Drop Connections: $createViewAndDropConnectionFunctions
+    Create Functions for View and Drop Connections: $addFunctionsForPSAndDropConnections
     Passwords generate by: $(if($didGeneratePassword){"This script"}else{"You"})
   $(if($canScramEncrypt){"Passwords will be stored as scram-hashes"})
   "
@@ -153,7 +187,7 @@ starting ...
   runOrDryRun @"
   Create Role $databaseOwner CreateDb CreateRole ;
   Grant $databaseOwner to current_user ;
-  CREATE DATABASE $databaseName With Owner $databaseOwner TEMPLATE = template0 $dbLocale ;
+  CREATE DATABASE $databaseName With Owner $databaseOwner TEMPLATE = template0 Encoding=`'$dbEncoding`' Locale= `'$dbLocale`' ;
   Alter Database $databaseName set client_encoding='UTF8' ;
   Create Role $appAccount Login Password `'$appAccountPassword`' ;
   Create Role $readonlyAppAccount Login Password `'$readonlyAppAccountPassword`' ;
@@ -165,7 +199,7 @@ starting ...
 "@  'postgres'
   
   
-  if($createViewAndDropConnectionFunctions)
+  if($addFunctionsForPSAndDropConnections)
   {
     "    Adding favourite Utilities to database postgres ..."
     
@@ -190,25 +224,25 @@ starting ...
   }
   
   if($addUUID){
-    "    Adding extension uuid-ossp to database lb ..."
+    "    Adding extension uuid-ossp to database $databaseName ..."
     runOrDryRun 'Create Extension If Not Exists "uuid-ossp" ;' $databaseName
   }
   
   if($addTrigram){
-    "    Adding extension pg_trgm to database lb ..."
+    "    Adding extension pg_trgm to database $databaseName ..."
     runOrDryRun 'Create Extension If Not Exists "pg_trgm" ;' $databaseName
   }
   
   if($addPlv8){
-    "    Adding extension plv8 to database lb ..."
+    "    Adding extension plv8 to database $databaseName ..."
     runOrDryRun 'Create Extension If Not Exists "plv8" ;' $databaseName
     
       if(-not $?){
         write-warning "Create Extension plv8 failed. Trying to first install to db=postgres"
-        'Create Extension If Not Exists "plv8" ;' | psql --host=$postgresHost -d postgres -U $adminUser -X --echo-all
-        'Create Extension If Not Exists "plv8" ;' | psql --host=$postgresHost -d lb -U $adminUser -X --echo-all
+        runOrDryRun 'Create Extension If Not Exists "plv8" ;' 'postgres'
+        runOrDryRun 'Create Extension If Not Exists "plv8" ;' $databaseName
     
-        if(-not $?){
+        if(-not $? -and (Test-Path $PSScriptRoot/install-postgres-plv8-extension.ps1)){
           write-warning "Create Extension plv8 failed. Trying to install plv8 to your postgres instance"
           start -verb runas powershell "$PSScriptRoot/install-postgres-plv8-extension.ps1"
           write-error "rerun this script after the server has restarted."
@@ -266,4 +300,4 @@ starting ...
   }
 }
 
-if($down){Down}else{Up}
+if($deleteDatabaseAndRoles){Down}else{Up}

@@ -2,40 +2,77 @@
 
 <#
   .SYNOPSIS
-  Update Postgres template1 —the default template database— to your preferred Locale settings.
+  Drop and re-Create postgres database template1 (the default template for Create Database) to have 
+  your preferred Locale settings for Encoding, LC_Collate and LC_CType. 
+
+  .Description
+  Drop and re-Create postgres database template1 (the default template for Create Database) to have 
+  your preferred Locale settings for Encoding, LC_Collate and LC_CType. 
+  
+  Discover your current OS login's locale with "Get-UICulture" on Windows or "locale" on unix/macOS.
+  
+  Discover what locales a machine supports using "locale --all" on unix/macOS or on Windows with
+  "using namespace System.Globalization; [CultureInfo]::GetCultures( [CultureTypes]::AllCultures )".
+  For a remote host, you can't do that, unless you can login to that host.
+
+  Additionally, this script allows you to add common extensions to the template. See the parameter 
+  help for -addUUID, -addPlv8, -addTrigram, -addFunctionsForPSAndDropConnections for more.
+
+  If you enjoy simplicity, don't touch encoding, leave it at UTF-8.
 
 #>
 
+using namespace System.Globalization
 Param(
-  $dbLocale,
-  $postgresHost="localhost",
-  [string]$adminUser=[Environment]::UserName,
-  $dbEncoding='UTF-8',
-  [switch]$createViewAndDropConnectionFunctions,
-  [switch]$addPlv8,
-  [switch]$addTrigram,
+  ##the Locale you choose must be supported by the Operating System that the postgres instance is running on.
+  [string]$dbLocale,
+  ##The postgres Host you wish to target
+  [string][Alias('H')]$postgresHost="localhost",
+  ##The postgres username to login with to run this script. Defaults to the OS username running this script.
+  [string][Alias('U')]$adminUser=[Environment]::UserName,
+  ##The encoding to set. Leave this at UTF-8 for simple worldwide compatibility
+  [string]$dbEncoding='UTF-8',
+  ##If set the extension uuid-ossp will be added, to add uuid functions to the database
   [switch]$addUUID,
-  [switch]$dryRun
+  ##If set, Functions called ps and DropConnections will be create to view and drop database connections
+  [switch]$addFunctionsForPSAndDropConnections,
+  ##If set the extension plv8 will be added, for javascript stored function support.
+  [switch]$addPlv8,
+  ##If set the extension trgm will be added, for trigram and text-search support.
+  [switch]$addTrigram,
+  ##If set, the SQL scripts will be echoed but not run
+  [switch]$dryRun,
+  ##Shows help and returns
+  [switch]$help,
+  ##Show available locales on this machine, and returns
+  [switch]$helpAvailableLocales
 )
 
-function defaultLocaleForLocalhost{
-  $nixenUK='en_GB'
-  $windowsenUK="English_United Kingdom"
-  $nixenUS="en_US"
-  $windowsenUS="English_United States"
-  $lc= if($IsWindows){$windowsenUK}else{$nixenUK}
-  return $lc
-}
-if(-not $dbLocale){$dbLocale= defaultLocaleForLocalhost}
-
 function runOrDryRun($command, $db, [switch]$onErrorStop){
-  if($dryRun){ "-d $db :  $command" }
+  if($dryRun){ "-d $db :\n$command" }
   else{
     $command | psql -v ON_ERROR_STOP=$(if($onErrorStop){1}else{0}) -X --echo-all `
-          --host=$postgresHost -d $db -U $superuser
+          --host=$postgresHost -d $db -U $adminUser
     return $?
   }
 }
+function defaultLocaleForLocalhost{
+  $lc= if($IsWindows){ 
+    (Get-UICulture).Name
+  }else{
+     $(locale | grep LC_COLLATE | sed 's/LC_COLLATE=\"//' | sed 's/\"//') 
+  }
+  return $lc
+}
+if(-not $dbLocale)
+{
+  $dbLocale=defaultLocaleForLocalhost
+  "Detected localhost locale as $dbLocale."
+  if($postgresHost -ne 'localhost' -and $postgresHost -ne '127.0.0.1'){
+    throw "When connecting to a remote server, you must specify the locale. It can only be auto-detected on localhost."
+  }
+}
+
 function validateParametersElseForceDryRun{
     $invalid= ('$postgresHost','$dbLocale','$dbEncoding','$adminUser').Where(
         {-not $ExecutionContext.InvokeCommand.ExpandString($_)})
@@ -46,9 +83,16 @@ function validateParametersElseForceDryRun{
 }
 validateParametersElseForceDryRun
 
+function help{ Get-Help $PSCommandPath ; Get-Help $PSCommandPath -Parameter '*' }
+if($help){help; Exit}
+function helpAvailableLocales{ [CultureInfo]::GetCultures( [CultureTypes]::AllCultures ) }
+if($helpAvailableLocales){helpAvailableLocales; Exit}
+
+
+
 "
 -----------------------------------------------------
-  Will log in to Host=$postgresHost as user=$adminUser to Drop then Create Template Database Template1:
+  Will log in to Host=$postgresHost as user=$adminUser to Drop then Create template Database template1:
   
     with
     Encoding=$dbEncoding
@@ -56,7 +100,7 @@ validateParametersElseForceDryRun
     add UUID extension: $addUUID
     add Trigram extension: $addTrigram
     add plv8 extension: $addPlv8
-    Create Functions for View and Drop Connections: $createViewAndDropConnectionFunctions
+    Create Functions for View and Drop Connections: $addFunctionsForPSAndDropConnections
 -----------------------------------------------------
 
 starting ...
@@ -77,7 +121,7 @@ runOrDryRun @"
 "@  'postgres'
 
 
-if($createViewAndDropConnectionFunctions)
+if($addFunctionsForPSAndDropConnections)
 {
   "    Adding View and Drop Connections Functions to database template1 ..."
   
