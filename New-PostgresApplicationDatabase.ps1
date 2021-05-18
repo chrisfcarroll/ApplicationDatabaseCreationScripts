@@ -23,11 +23,9 @@
   .LINK
   For Scram encryption (requires python3): https://gist.github.com/chrisfcarroll/4c819af67ec5485ed0d6aef7863562a4
 #>
-
-
 Param(
   ##A name for the new database
-  [string]$databaseName="appname",
+  [string][ValidatePattern('(".+"|[^"]+)')]$databaseName="appname",
   ##The postgres Host you wish to target
   [string][Alias('H')]$postgresHost="localhost",
   ##The postgres username to login with to run this script. Defaults to the OS username running this script.
@@ -67,7 +65,7 @@ Param(
 )
 
 function runOrDryRun($command, $db, [switch]$onErrorStop){
-  if($dryRun){ "-d $db :  $command" }
+  if($dryRun){ "-d $db :`n$command" }
   else{
     $command | psql -v ON_ERROR_STOP=$(if($onErrorStop){1}else{0}) -X --echo-all `
           --host=$postgresHost -d $db -U $adminUser
@@ -85,8 +83,8 @@ function defaultLocaleForLocalhost{
 if(-not $dbLocale)
 {
   $dbLocale=defaultLocaleForLocalhost
-  "Detected localhost locale as $dbLocale."
-  if($postgresHost -ne 'localhost' -and $postgresHost -ne '127.0.0.1'){
+  $script:didAutodetectLocale= -not [string]::IsNullOrWhiteSpace($dbLocale)
+  if(-not ($postgresHost -match "^(localhost|127.0.0.\d+|::1?)$")){
     throw "When connecting to a remote server, you must specify the locale. It can only be auto-detected on localhost."
   }
 }
@@ -96,21 +94,61 @@ if($help){help; Exit}
 function helpAvailableLocales{ [CultureInfo]::GetCultures( [CultureTypes]::AllCultures ) }
 if($helpAvailableLocales){helpAvailableLocales; Exit}
 
-function sanitiseAndValidateParametersElseForceDryRun{
+function isQuoted([string]$str){return $str -like '"*"'}
+function quote([string]$str){return ((isQuoted $str) ? $str : '"'+$str+'"') }
+function isValidPostgressIdentifier([string]$str){return ($str -cmatch '^[_\p{Ll}][_\p{Ll}\p{Mn}\d]*$') -or ($str -like '"*"') }
+function qadd([string]$left,[string]$right,$quotemark='"'){
+  $isQl=(isQuoted $left)
+  $isQr=(isQuoted $right)
+  $l= $isQl ? $left.Substring(1,$left.Length-2)   : $left
+  $r= $isQr ? $right.Substring(1,$right.Length-2) : $right
+  $a= ($isQl -or $isQr) ? (quote ($l + $r) ) : ($l + $r)
+  return $a
+}
 
-  $script:appAccount= [string]::IsNullOrWhiteSpace( $appAccount ) ? $databaseName : $appAccount
-  $script:readonlyAppAccount= [string]::IsNullOrWhiteSpace( $readonlyAppAccount ) ? $databaseName+"_readonly" : $readonlyAppAccount
-  $script:databaseOwner= [string]::IsNullOrWhiteSpace( $databaseOwner ) ? $databaseName+"_owner" : $databaseOwner  
-  
-  $invalid= ('$postgresHost','$databaseName','$dbLocale','$dbEncoding','$databaseOwner',
-             '$appAccount','$readonlyAppAccount','$adminUser'
-             ).Where( {-not (Invoke-Expression $_)})
+function sanitiseAndAutocompleteParameters{
+  if(-not (isValidPostgressIdentifier $databaseName)){
+    $script:databaseName= $databaseName.ToLower()
+    if(isValidPostgressIdentifier $databaseName){
+      if(-not $deleteDatabaseAndRoles){ Write-Warning "Your database name will be lowercased." }
+    }else{
+      throw "$databaseName is not a valid postgres database name. Either surround it in `"Double Quotes`" or" + 
+            "change it to lowercase letters and numbers with no punctuation."
+    }
+  }
+  $script:databaseOwner= [string]::IsNullOrWhiteSpace( $databaseOwner ) ? (qadd $databaseName "_owner") : $databaseOwner.ToLower()
+  $script:appAccount= [string]::IsNullOrWhiteSpace( $appAccount ) ? $databaseName : $appAccount.ToLower()
+  $script:readonlyAppAccount= [string]::IsNullOrWhiteSpace( $readonlyAppAccount ) ? (qadd $databaseName "_readonly") : $readonlyAppAccount.ToLower()
+}
+function validateUpParametersElseForceDryRun{
+
+  $requireds= '$postgresHost','$databaseName','$dbLocale','$dbEncoding','$databaseOwner',
+    '$appAccount','$readonlyAppAccount','$adminUser'
+  $invalid= $requireds.Where( {-not (Invoke-Expression $_)})
   if($invalid.Count){
-    $script:dryRun.IsPresent=$true
+    $script:dryRun=$true
     write-warning "dry running because you missed a parameter: $invalid"
   }
+
+  $identifiers= '$databaseName','$databaseOwner','$appAccount','$readonlyAppAccount'
+  $invalid= $identifiers.Where( {-not (isValidPostgressIdentifier (Invoke-Expression $_))})
+  if($invalid.Count){
+    $script:dryRun=$true
+    write-warning "dry running because some parameters are not valid postgress identifiers: $invalid"
+    write-warning "NB to supply a quoted string in powershell,bash,etc you must quote the quotes, e.g.:  `'`"Quoted Name!`"`' "
+  }
 }
-sanitiseAndValidateParametersElseForceDryRun
+function validateDownParametersElseForceDryRun{
+  $requireds= ('$postgresHost','$databaseName','$databaseOwner','$appAccount','$readonlyAppAccount')
+  $invalids= $requireds | Where-Object { -not (Invoke-Expression $_) }
+
+  if($invalid.Count){
+    $dryRun=$true
+    write-warning "dry running because you missed a parameter: $([string]::Join(", ", $invalids))"
+  }
+}
+sanitiseAndAutocompleteParameters
+if($deleteDatabaseAndRoles){validateDownParametersElseForceDryRun}else{validateUpParametersElseForceDryRun}
 
 function New-Password([int]$length=12){ 
   1..($length * 3) |
@@ -133,12 +171,6 @@ function Up{
     $didGeneratePassword=$true
   }
 
-  if($didGeneratePassword)
-  {
-    write-warning "-----------------------------------------------------
-You did not provide passwords, so passwords were created and shown above this line."
-  }
-
   if(get-command scram_postgres_password.py){
     $canScramEncrypt=$true
     $appAccountPassword= scram_postgres_password.py $appAccount $appAccountPassword
@@ -149,6 +181,13 @@ You did not provide passwords, so passwords were created and shown above this li
     $appAccountPassword= "md5" + $(md5 ($appAccountPassword + $appAccount))
     $readonlyAppAccountPassword = "md5" + $(md5 ($readonlyAppAccountPassword + $readonlyAppAccount))
   }
+
+  if($didGeneratePassword)
+  {
+    write-warning "-----------------------------------------------------
+You did not provide passwords, so passwords were created and shown above this line."
+  }
+  if($didAutodetectLocale){"Detected localhost locale as $dbLocale."}
 
   "
 -----------------------------------------------------
@@ -165,7 +204,7 @@ You did not provide passwords, so passwords were created and shown above this li
     add plv8 extension: $addPlv8
     Create Functions for View and Drop Connections: $addFunctionsForPSAndDropConnections
     Passwords generate by: $(if($didGeneratePassword){"This script"}else{"You"})
-  $(if($canScramEncrypt){"Passwords will be stored as scram-hashes"})
+    $(if($canScramEncrypt){"Passwords will be stored as scram-hashes"})
   "
 
   "
@@ -173,29 +212,18 @@ You did not provide passwords, so passwords were created and shown above this li
 
 starting ...
 "
-
-  $requireds= ('$postgresHost','$databaseName','$dbLocale','$databaseOwner','$appAccount','$readonlyAppAccount',
-  '$appAccountPassword','$readonlyAppAccountPassword')
-  $invalids= $requireds | Where-Object { -not $ExecutionContext.InvokeCommand.ExpandString($_) }
-
-  if($invalid.Count){
-    $dryRun=$true
-    write-warning "dry running because you missed a parameter: $([string]::Join(", ", $invalids))"
-  }
-
-
   runOrDryRun @"
-  Create Role $databaseOwner CreateDb CreateRole ;
-  Grant $databaseOwner to current_user ;
-  CREATE DATABASE $databaseName With Owner $databaseOwner TEMPLATE = template0 Encoding=`'$dbEncoding`' Locale= `'$dbLocale`' ;
-  Alter Database $databaseName set client_encoding='UTF8' ;
-  Create Role $appAccount Login Password `'$appAccountPassword`' ;
-  Create Role $readonlyAppAccount Login Password `'$readonlyAppAccountPassword`' ;
-  Grant Connect , Temporary on Database $databaseName TO $appAccount ;
-  Grant Connect , Temporary on Database $databaseName TO $readonlyAppAccount ;
-  Grant $readonlyAppAccount to $appAccount;
-  Grant $appAccount to $databaseOwner;
-  Revoke Connect On Database $databaseName From Public;
+    Create Role $databaseOwner CreateDb CreateRole ;
+    Grant $databaseOwner to current_user ;
+    CREATE DATABASE $databaseName With Owner $databaseOwner TEMPLATE = template0 Encoding=`'$dbEncoding`' Locale= `'$dbLocale`' ;
+    Alter Database $databaseName set client_encoding='UTF8' ;
+    Create Role $appAccount Login Password `'$appAccountPassword`' ;
+    Create Role $readonlyAppAccount Login Password `'$readonlyAppAccountPassword`' ;
+    Grant Connect , Temporary on Database $databaseName TO $appAccount ;
+    Grant Connect , Temporary on Database $databaseName TO $readonlyAppAccount ;
+    Grant $readonlyAppAccount to $appAccount;
+    Grant $appAccount to $databaseOwner;
+    Revoke Connect On Database $databaseName From Public;
 "@  'postgres'
   
   
@@ -204,22 +232,22 @@ starting ...
     "    Adding favourite Utilities to database postgres ..."
     
     runOrDryRun @"
-  Create or Replace Function ps() 
-    Returns Table (pid int, datname name, usename name, application_name text, client_addr inet) 
-    Language SQL 
-    As 'Select a.pid, a.datname, a.usename, a.application_name, a.client_addr from pg_stat_activity a' ;
-  
-  Create or Replace Function DropConnections(id int, database name)
-    Returns Void
-    Language PlpgSQL
-    As `$`$
-    Begin
-      If (id is null and database is null ) Then Raise 'At least one of id or database must be not-null' ; End If;
-      Perform pg_terminate_backend(pg_stat_activity.pid)
-      FROM pg_stat_activity
-      WHERE ( pg_stat_activity.datname = database Or database is null)
-        AND ( pid = id or id is null);
-    End `$`$;
+      Create or Replace Function ps() 
+        Returns Table (pid int, datname name, usename name, application_name text, client_addr inet) 
+        Language SQL 
+        As 'Select a.pid, a.datname, a.usename, a.application_name, a.client_addr from pg_stat_activity a' ;
+      
+      Create or Replace Function DropConnections(id int, database name)
+        Returns Void
+        Language PlpgSQL
+        As `$`$
+        Begin
+          If (id is null and database is null ) Then Raise 'At least one of id or database must be not-null' ; End If;
+          Perform pg_terminate_backend(pg_stat_activity.pid)
+          FROM pg_stat_activity
+          WHERE ( pg_stat_activity.datname = database Or database is null)
+            AND ( pid = id or id is null);
+        End `$`$;
 "@ 'postgres'
   }
   
@@ -254,26 +282,17 @@ starting ...
 
 function Down{
 
-  "
------------------------------------------------------
+  "-----------------------------------------------------
   Will log in to Host=$postgresHost as User=$adminUser to Drop Database and Roles:
-  
-    database Owner=$databaseOwner
-    Application Login=$appAccount
-    Application Readonly Login=$readonlyAppAccount
+    
+      database Owner=$databaseOwner
+      Application Login=$appAccount
+      Application Readonly Login=$readonlyAppAccount
 
------------------------------------------------------
+  -----------------------------------------------------
 
-starting ...
+  starting ...
 "
-
-  $requireds= ('$postgresHost','$databaseName','$databaseOwner','$appAccount','$readonlyAppAccount')
-  $invalids= $requireds | Where-Object { -not $ExecutionContext.InvokeCommand.ExpandString($_) }
-
-  if($invalid.Count){
-    $dryRun=$true
-    write-warning "dry running because you missed a parameter: $([string]::Join(", ", $invalids))"
-  }
 
   if(runOrDryRun @"
 \set ON_ERROR_STOP on
@@ -282,20 +301,18 @@ starting ...
     If Exists (select * from information_schema.tables 
             where table_schema not in ('pg_catalog','information_schema')) Then
         Raise Exception 'Aborted Drop database and roles because tables have been created. First Drop the Tables' ;
-    Else
-        Raise Notice 'This script will drop the ROLES created but cannot drop the DATABASE. You must do that 
-        manually.';
     End If;
     End `$`$     
-"@  $databaseName){
+"@ $databaseName)
+  {
     runOrDryRun @"
-    Revoke all On Database $databaseName from $appAccount ;
-    Revoke all On Database $databaseName from $readonlyAppAccount ;
-    Alter Database $databaseName Owner to $adminUser ; 
-    Drop role $appAccount ;
-    Drop role $readonlyAppAccount ;
-    Drop role $databaseOwner ;
-    Drop Database $databaseName;    
+      Revoke all On Database $databaseName from $appAccount ;
+      Revoke all On Database $databaseName from $readonlyAppAccount ;
+      Alter Database $databaseName Owner to $adminUser ; 
+      Drop role $appAccount ;
+      Drop role $readonlyAppAccount ;
+      Drop role $databaseOwner ;
+      Drop Database $databaseName;    
 "@ 'postgres'
   }
 }
