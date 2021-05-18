@@ -42,10 +42,20 @@ Param(
   ##The password to use for -appAccount. If not is given, one will be generated and displayed as the
   ##second or first line of output of this script.
   [string]$readonlyAppAccountPassword,
-  ##The encoding to set. Leave this at UTF-8 for simple worldwide compatibility
-  [string]$dbEncoding='UTF-8',
-  ##the Locale you choose must be supported by the Operating System that the postgres instance is running on.
-  [string]$dbLocale,
+  ##The postgres template to use for the new database. The default is template1 but if you specify 
+  ##-dbLocale or -dbEncoding then template0 must be used.
+  [string]$template,
+  ##An abbreviation for -template 'template0'
+  ##If you specify -template0 but don't set -dbLocale or -dbEncoding then :
+  ## • Locale will be auto-detected for localhost, but an exception will be thrown for a remote host
+  ## • Encoding will be set to UTF-8
+  [switch]$template0,
+  ##If this parameter is set, then template will be set to 'template0'.
+  ##Leave this blank (defaults to UTF-8) for simple worldwide compatibility.
+  [string]$encoding,
+  ##If this parameter is set, then template will be set to 'template0'. The Locale you choose
+  ## must be supported by the Operating System that the postgres instance is running on.
+  [string]$locale,
   ##If set the extension uuid-ossp will be added, to add uuid functions to the database
   [bool]$addUUID=$true,
   ##If set, Functions called ps and DropConnections will be create to view and drop database connections
@@ -67,28 +77,11 @@ Param(
 function runOrDryRun($command, $db, [switch]$onErrorStop){
   if($dryRun){ "-d $db :`n$command" }
   else{
-    $command | psql -v ON_ERROR_STOP=$(if($onErrorStop){1}else{0}) -X --echo-all `
-          --host=$postgresHost -d $db -U $adminUser
-    return $?
+    $r= ($command | psql -v ON_ERROR_STOP=$(if($onErrorStop){'ON'}else{'OFF'}) -X --echo-all `
+          --host=$postgresHost -d $db -U $adminUser)
+    return $? ? $r : $?
   }
 }
-function defaultLocaleForLocalhost{
-  $lc= if($IsWindows){ 
-    (Get-UICulture).Name
-  }else{
-     $(locale | grep LC_COLLATE | sed 's/LC_COLLATE=\"//' | sed 's/\"//') 
-  }
-  return $lc
-}
-if(-not $dbLocale)
-{
-  $dbLocale=defaultLocaleForLocalhost
-  $script:didAutodetectLocale= -not [string]::IsNullOrWhiteSpace($dbLocale)
-  if(-not ($postgresHost -match "^(localhost|127.0.0.\d+|::1?)$")){
-    throw "When connecting to a remote server, you must specify the locale. It can only be auto-detected on localhost."
-  }
-}
-
 function help{ Get-Help $PSCommandPath ; Get-Help $PSCommandPath -Parameter '*' }
 if($help){help; Exit}
 function helpAvailableLocales{ [CultureInfo]::GetCultures( [CultureTypes]::AllCultures ) }
@@ -96,6 +89,7 @@ if($helpAvailableLocales){helpAvailableLocales; Exit}
 
 function isQuoted([string]$str){return $str -like '"*"'}
 function quote([string]$str){return ((isQuoted $str) ? $str : '"'+$str+'"') }
+function unQuote([string]$str){return ((isQuoted $str) ? $str.Substring(1,$str.Length-2) : $str) }
 function isValidPostgressIdentifier([string]$str){return ($str -cmatch '^[_\p{Ll}][_\p{Ll}\p{Mn}\d]*$') -or ($str -like '"*"') }
 function qadd([string]$left,[string]$right,$quotemark='"'){
   $isQl=(isQuoted $left)
@@ -122,8 +116,7 @@ function sanitiseAndAutocompleteParameters{
 }
 function validateUpParametersElseForceDryRun{
 
-  $requireds= '$postgresHost','$databaseName','$dbLocale','$dbEncoding','$databaseOwner',
-    '$appAccount','$readonlyAppAccount','$adminUser'
+  $requireds= '$postgresHost','$databaseName','$databaseOwner','$appAccount','$readonlyAppAccount','$adminUser'
   $invalid= $requireds.Where( {-not (Invoke-Expression $_)})
   if($invalid.Count){
     $script:dryRun=$true
@@ -158,6 +151,41 @@ function New-Password([int]$length=12){
           ForEach-Object {$agg=""} {$agg += $_} {$agg} 
 }
 
+function defaultLocaleForLocalhost{
+  $lc= if($IsWindows){ 
+    (Get-UICulture).Name
+  }else{
+     $(locale | grep LC_COLLATE | sed 's/LC_COLLATE=\"//' | sed 's/\"//') 
+  }
+  return $lc
+}
+function defaultEncodingUTF8{return 'UTF-8'}
+
+function deduceTemplateLocaleEncodingElseThrow{
+  if($template0){$script:template='template0'}
+
+  if(($encoding -or $locale) -and -not $template)
+  {
+    $script:didAutoSetTemplate0=$true
+    $script:template='template0'
+  }
+
+  $result=switch($template)
+  {
+    'template0'
+    {
+      $locale= $locale ? $locale : (defaultLocaleForLocalhost)
+      $encoding= $encoding ? $encoding : (defaultEncodingUTF8)
+      $script:didAutodetectLocale= $locale -and -not $script:dbLocale
+      "TEMPLATE = template0 Encoding=`'$encoding`' Locale= `'$locale`'"
+    }
+    {[string]::IsNullOrWhiteSpace($_)}
+                                      {""}
+    default {"TEMPLATE= $template"}
+  }
+  return $result
+}
+
 function Up{
 
   if(-not $appAccountPassword){
@@ -171,7 +199,7 @@ function Up{
     $didGeneratePassword=$true
   }
 
-  if(get-command scram_postgres_password.py){
+  if(get-command scram_postgres_password.py -ErrorAction SilentlyContinue){
     $canScramEncrypt=$true
     $appAccountPassword= scram_postgres_password.py $appAccount $appAccountPassword
     $readonlyAppAccountPassword=scram_postgres_password.py $readonlyAppAccount $readonlyAppAccountPassword
@@ -187,7 +215,13 @@ function Up{
     write-warning "-----------------------------------------------------
 You did not provide passwords, so passwords were created and shown above this line."
   }
-  if($didAutodetectLocale){"Detected localhost locale as $dbLocale."}
+  
+  $templateAndLocaleSettings=deduceTemplateLocaleEncodingElseThrow
+  if($didAutoSetTemplate0){"Setting template=template0 because you specified Locale or Encoding"}
+  if($didAutodetectLocale){"Detected localhost locale as $locale."}
+  if($didAutodetectLocale -and -not ($postgresHost -match "^(localhost|127.0.0.\d+|::1?)$")){
+    throw "When connecting to a remote server, you must specify the locale. It can only be auto-detected on localhost."
+  }
 
   "
 -----------------------------------------------------
@@ -195,8 +229,7 @@ You did not provide passwords, so passwords were created and shown above this li
   
     Database= $databaseName 
     with
-    database Owner=$databaseOwner
-    Locale=$dbLocale
+    database Owner=$databaseOwner $templateAndLocaleSettings
     application Login=$appAccount
     application readonly login=$readonlyAppAccount
     add UUID extension: $addUUID
@@ -215,7 +248,7 @@ starting ...
   runOrDryRun @"
     Create Role $databaseOwner CreateDb CreateRole ;
     Grant $databaseOwner to current_user ;
-    CREATE DATABASE $databaseName With Owner $databaseOwner TEMPLATE = template0 Encoding=`'$dbEncoding`' Locale= `'$dbLocale`' ;
+    CREATE DATABASE $databaseName With Owner $databaseOwner $templateAndLocaleSettings;
     Alter Database $databaseName set client_encoding='UTF8' ;
     Create Role $appAccount Login Password `'$appAccountPassword`' ;
     Create Role $readonlyAppAccount Login Password `'$readonlyAppAccountPassword`' ;
@@ -229,7 +262,7 @@ starting ...
   
   if($addFunctionsForPSAndDropConnections)
   {
-    "    Adding favourite Utilities to database postgres ..."
+    "    Adding functions ps() and DropConnections() ..."
     
     runOrDryRun @"
       Create or Replace Function ps() 
@@ -248,7 +281,7 @@ starting ...
           WHERE ( pg_stat_activity.datname = database Or database is null)
             AND ( pid = id or id is null);
         End `$`$;
-"@ 'postgres'
+"@ $databaseName
   }
   
   if($addUUID){
@@ -293,17 +326,22 @@ function Down{
 
   starting ...
 "
-
-  if(runOrDryRun @"
-\set ON_ERROR_STOP on
+$dbExists= (psql -l | select-string "^\s$(unQuote $databaseName)\s+\|\s+") -and $true
+$tablesExist= $dbExists -and -not (runOrDryRun @"
     Do `$`$
     Begin
     If Exists (select * from information_schema.tables 
             where table_schema not in ('pg_catalog','information_schema')) Then
-        Raise Exception 'Aborted Drop database and roles because tables have been created. First Drop the Tables' ;
+        Raise Exception 'Tables Exist' ;
     End If;
     End `$`$     
-"@ $databaseName)
+"@ $databaseName 'ON')
+
+  if ($dbExists -and $tablesExist)
+  {
+    write-warning "Aborted Drop Database $databaseName and Roles because tables have been created. First Drop the Tables."
+  }
+  else
   {
     runOrDryRun @"
       Revoke all On Database $databaseName from $appAccount ;
