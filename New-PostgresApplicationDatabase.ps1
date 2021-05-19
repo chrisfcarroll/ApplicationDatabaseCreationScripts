@@ -18,14 +18,14 @@
   - Optionally create functions for view and drop database connections
    
   .LINK
-  https://gist.github.com/chrisfcarroll/ed3f8c368ad6bdbbe8a71d4c3afa48f7
+  https://github.com/chrisfcarroll/ApplicationDatabases
   
   .LINK
   For Scram encryption (requires python3): https://gist.github.com/chrisfcarroll/4c819af67ec5485ed0d6aef7863562a4
 #>
 Param(
   ##A name for the new database
-  [string][ValidatePattern('(".+"|[^"]+)')]$databaseName="appname",
+  [string][ValidatePattern('(".+"|^[_\p{Ll}][_\p{Ll}\p{Mn}\d]*$)')]$databaseName="appname",
   ##The postgres Host you wish to target
   [string][Alias('H')]$postgresHost="localhost",
   ##The postgres username to login with to run this script. Defaults to the OS username running this script.
@@ -39,7 +39,7 @@ Param(
   [string]$appAccountPassword,
   ##The name of the Role to Create having read access to the new database
   [string]$readonlyAppAccount,
-  ##The password to use for -appAccount. If not is given, one will be generated and displayed as the
+  ##The password to use for -readonlyAppAccount. If not is given, one will be generated and displayed as the
   ##second or first line of output of this script.
   [string]$readonlyAppAccountPassword,
   ##The postgres template to use for the new database. The default is template1 but if you specify 
@@ -90,7 +90,9 @@ if($helpAvailableLocales){helpAvailableLocales; Exit}
 function isQuoted([string]$str){return $str -like '"*"'}
 function quote([string]$str){return ((isQuoted $str) ? $str : '"'+$str+'"') }
 function unQuote([string]$str){return ((isQuoted $str) ? $str.Substring(1,$str.Length-2) : $str) }
-function isValidPostgressIdentifier([string]$str){return ($str -cmatch '^[_\p{Ll}][_\p{Ll}\p{Mn}\d]*$') -or ($str -like '"*"') }
+
+$postgresValidIdentifierRegex='^[_\p{Ll}][_\p{Ll}\p{Mn}\d]*$'
+function isValidPostgressIdentifier([string]$str){return ($str -cmatch $postgresValidIdentifierRegex) -or ($str -like '"*"') }
 function qadd([string]$left,[string]$right,$quotemark='"'){
   $isQl=(isQuoted $left)
   $isQr=(isQuoted $right)
