@@ -1,0 +1,859 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"help",
+				"helpFull"
+			],
+			[
+				"sqlcmd",
+				"sqlcmdGet"
+			],
+			[
+				"sql",
+				"sqlcmdGet"
+			],
+			[
+				"SQL",
+				"SQLCMDSERVER"
+			],
+			[
+				"db",
+				"dbEncoding"
+			],
+			[
+				"data",
+				"databaseName"
+			],
+			[
+				"pass",
+				"password"
+			],
+			[
+				"read",
+				"readonlyAppAccountPassword"
+			],
+			[
+				"app",
+				"appAccountPassword"
+			],
+			[
+				"tr",
+				"true"
+			],
+			[
+				"run",
+				"runOrDryRun"
+			],
+			[
+				"dat",
+				"databaseName"
+			],
+			[
+				"post",
+				"postgresHost"
+			],
+			[
+				"pos",
+				"postgresHost"
+			],
+			[
+				"add",
+				"addTrigram"
+			],
+			[
+				"Tr",
+				"addTrigram"
+			],
+			[
+				"sour",
+				"sourcePath3"
+			],
+			[
+				"mou",
+				"mountPath"
+			],
+			[
+				"ke",
+				"keysourcep"
+			],
+			[
+				"not",
+				"notok"
+			],
+			[
+				"te",
+				"Test-Path"
+			],
+			[
+				"Vol",
+				"VolumeName"
+			],
+			[
+				"gc",
+				"gchcpath"
+			],
+			[
+				"moutn",
+				"mount_vera"
+			],
+			[
+				"l",
+				"localsubnet"
+			],
+			[
+				"bord",
+				"border-top\tproperty"
+			],
+			[
+				"padd",
+				"padding-top\tproperty"
+			],
+			[
+				"TLDR",
+				"TLDRPerYear"
+			],
+			[
+				"TLD",
+				"TLDRPerYear"
+			],
+			[
+				"OnsSexOf",
+				"OnsSexOffCSEW2018Appendix"
+			],
+			[
+				"MEan",
+				"MeanFourth"
+			],
+			[
+				"MEa",
+				"MeanCubed"
+			],
+			[
+				"Mean",
+				"MeanSquared"
+			],
+			[
+				"Tim",
+				"TimeStep"
+			],
+			[
+				"Mea",
+				"MeanSquared"
+			],
+			[
+				"Time",
+				"TimeEvolution"
+			],
+			[
+				"tenso",
+				"tensorflow-gpu"
+			],
+			[
+				"fa",
+				"false"
+			],
+			[
+				"micro",
+				"microsoft-dsvm"
+			],
+			[
+				"py",
+				"pythonCommandToRun"
+			],
+			[
+				"tmu",
+				"tmuxbashpythoncommand"
+			],
+			[
+				"pyth",
+				"pythonCommandToRun"
+			],
+			[
+				"ima",
+				"imageUrn"
+			],
+			[
+				"micr",
+				"microsoft-ads"
+			],
+			[
+				"cond",
+				"condaPredefinedEnvName"
+			],
+			[
+				"image",
+				"imagesku"
+			],
+			[
+				"conda",
+				"condaEnvironmentSpec"
+			],
+			[
+				"pre",
+				"condaPredefinedEnvName"
+			],
+			[
+				"is",
+				"isNewlyCreatedVM"
+			],
+			[
+				"con",
+				"condaPredefinedEnvName"
+			],
+			[
+				"re",
+				"recreateCondaEnvironment"
+			],
+			[
+				"envir",
+				"environment"
+			],
+			[
+				"log",
+				"logName"
+			],
+			[
+				"vm",
+				"vmName"
+			],
+			[
+				"copy",
+				"copyFromLocal"
+			],
+			[
+				"recursie",
+				"recursiveFetch"
+			],
+			[
+				"recus",
+				"recursiveCopy"
+			],
+			[
+				"recu",
+				"recursiveCopy"
+			],
+			[
+				"fet",
+				"fetchOutput"
+			],
+			[
+				"or",
+				"overrides"
+			],
+			[
+				"subdir",
+				"subdirectories"
+			],
+			[
+				"az",
+				"azureuser"
+			],
+			[
+				"he",
+				"hello-world"
+			],
+			[
+				"pip",
+				"pipPackagesToUpgrade"
+			],
+			[
+				"di",
+				"directory"
+			],
+			[
+				"comm",
+				"commandToRun"
+			],
+			[
+				"vers",
+				"versionedNames"
+			],
+			[
+				"condaPackages",
+				"condaPackagesToInstall"
+			],
+			[
+				"Data",
+				"linux-data-science-vm"
+			],
+			[
+				"do",
+				"doesAccountLookFree"
+			],
+			[
+				"write",
+				"write-warning"
+			],
+			[
+				"outp",
+				"fetchOutputFrom"
+			],
+			[
+				"resource",
+				"resourceGroupName"
+			],
+			[
+				"Copy",
+				"copyLocalFolder"
+			],
+			[
+				"tm",
+				"tmuxcommand"
+			],
+			[
+				"para",
+				"Parameter"
+			],
+			[
+				"ssh",
+				"sshOK"
+			],
+			[
+				"isnt",
+				"installurl"
+			],
+			[
+				"inst",
+				"installurl"
+			],
+			[
+				"confir",
+				"confirmation"
+			],
+			[
+				"no",
+				"noConfirm"
+			],
+			[
+				"No",
+				"NoConfirm"
+			],
+			[
+				"pric",
+				"pricingTier"
+			],
+			[
+				"envi",
+				"environmentName"
+			],
+			[
+				"mode",
+				"model_save_dir"
+			],
+			[
+				"mod",
+				"model_save_dir"
+			],
+			[
+				"test",
+				"test_accuracy"
+			],
+			[
+				"scr",
+				"scriptDir"
+			],
+			[
+				"comp",
+				"computetargets"
+			],
+			[
+				"Tenso",
+				"TensorFlow"
+			],
+			[
+				"mat",
+				"matches"
+			],
+			[
+				"resou",
+				"resourceGroupName"
+			],
+			[
+				"expre",
+				"experimentName"
+			],
+			[
+				"datas",
+				"datasetName"
+			],
+			[
+				"dataset",
+				"datasetName"
+			],
+			[
+				"ba",
+				"baseImage"
+			],
+			[
+				"chose",
+				"chosenEnvironment"
+			],
+			[
+				"cho",
+				"chosenEnvironment"
+			],
+			[
+				"environ",
+				"environmentJson"
+			],
+			[
+				"environment",
+				"environmentJson"
+			],
+			[
+				"exi",
+				"existingMachine"
+			],
+			[
+				"wor",
+				"workingFolder"
+			],
+			[
+				"comman",
+				"commandToRun"
+			],
+			[
+				"pu",
+				"publicIpAddress"
+			],
+			[
+				"work",
+				"workingFolder"
+			],
+			[
+				"cop",
+				"copyLocalFolder"
+			],
+			[
+				"Py",
+				"PySpark"
+			],
+			[
+				"Run",
+				"runconfig"
+			],
+			[
+				"Ask",
+				"Ask-YesNo"
+			],
+			[
+				"loca",
+				"copyLocalFolder"
+			],
+			[
+				"contain",
+				"container"
+			],
+			[
+				"azure",
+				"azureml"
+			],
+			[
+				"computetar",
+				"computetarget"
+			],
+			[
+				"specif",
+				"specifying"
+			],
+			[
+				"Vali",
+				"ValidateSet"
+			],
+			[
+				"accou",
+				"account_type_prefix"
+			],
+			[
+				"NC",
+				"NC6_PROMO"
+			],
+			[
+				"repo",
+				"repository"
+			],
+			[
+				"git",
+				"gitRepository"
+			],
+			[
+				"datase",
+				"DatasetName"
+			],
+			[
+				"das",
+				"dataset"
+			],
+			[
+				"New",
+				"NewLine"
+			],
+			[
+				"env",
+				"Environment"
+			],
+			[
+				"Environ",
+				"environments"
+			],
+			[
+				"expi",
+				"experimentName"
+			],
+			[
+				"prev",
+				"previousComputeTargetRunConfig"
+			],
+			[
+				"did",
+				"didSpecifyMoreParameters"
+			],
+			[
+				"att",
+				"attachFolder"
+			]
+		]
+	},
+	"buffers":
+	[
+	],
+	"build_system": "",
+	"build_system_choices":
+	[
+		[
+			[
+				[
+					"Packages/C++/C Single File.sublime-build",
+					""
+				],
+				[
+					"Packages/C++/C Single File.sublime-build",
+					"Run"
+				]
+			],
+			[
+				"Packages/C++/C Single File.sublime-build",
+				"Run"
+			]
+		]
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"insta",
+				"Package Control: Install Package"
+			],
+			[
+				"install",
+				"Package Control: Install Package"
+			],
+			[
+				"INSTALL PAC",
+				"Package Control: Install Package"
+			],
+			[
+				"package",
+				"Package Control: List Packages"
+			],
+			[
+				"instal",
+				"Package Control: Install Package"
+			],
+			[
+				"isnta",
+				"Package Control: Install Package"
+			],
+			[
+				"coq",
+				"Coq: Start"
+			]
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 356.0,
+		"history":
+		[
+			"print('\\n'*20)",
+			"cls",
+			"clear"
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"expanded_folders":
+	[
+		"/Users/chris/Source/Repos/ApplicationDatabases"
+	],
+	"file_history":
+	[
+		"/Users/chris/Source/Repos/ApplicationDatabases/New-SqlServerApplicationDatabase.ps1",
+		"/Users/chris/.config/chris/secrets.fish",
+		"/Users/chris/.config/chris/secrets.ps1",
+		"/Users/chris/Desktop/2021-05-12 Karen.md",
+		"/Volumes/GrowthCo/GreenTech Noted or Filed/support finder.txt",
+		"/Volumes/GrowthCo/GreenTech Noted or Filed/Session 1 2 Post discussion with Amy K.txt",
+		"/Volumes/GrowthCo/GreenTech Noted or Filed/GC Day 1.txt",
+		"/Volumes/GrowthCo/GreenTech Noted or Filed/Adrian Interview The Manufacturing Institute 2021 April.txt",
+		"/Volumes/GrowthCo/GreenTech Noted or Filed/April 12 Mtg.txt",
+		"/Volumes/GrowthCo/GreenTech Noted or Filed/Adrian TMI 2021 April.txt",
+		"/Users/chris/.config/.gitignore",
+		"/Users/chris/.config/Home.git/config",
+		"/Users/chris/.git/COMMIT_EDITMSG",
+		"/Users/chris/.gitignore",
+		"/Users/chris/.zshenv",
+		"/Users/chris/.zshrc",
+		"/Users/chris/.profile",
+		"/Users/chris/.bashrc",
+		"/Users/chris/OneDrive/DevMachine/macOS/bash_profile.OneDrive.bash",
+		"/Users/chris/OneDrive/DevMachine/Windows/Microsoft.PowerShell_profile.ps1",
+		"/Users/chris/OneDrive/DevMachine/macOS/fish_profile.OneDrive.fish",
+		"/Users/chris/.cargo/env",
+		"/Users/chris/Downloads/install-rust.sh",
+		"/Users/chris/Source/Repos/UmbracoNetCoreStarter/create-postgres-database.ps1",
+		"/Users/chris/Source/Repos/create-postgres-database.ps1",
+		"/Users/chris/Library/Application Support/Code/User/settings.json",
+		"/Users/chris/OneDrive/DevMachine/Settings/vscode_custom.css",
+		"/Users/chris/Library/Application Support/Code/User/custom.css",
+		"/Users/chris/Source/Repos/ApplicationDatabases/New-PostgresApplicationDatabase.ps1",
+		"/Users/chris/Source/Repos/ApplicationDatabases/Set-PostgresTemplate1DefaultLocale.ps1",
+		"/Users/chris/Source/Repos/ApplicationDatabases/localesMacOS.txt",
+		"/Users/chris/Source/Repos/ApplicationDatabases/localesWindows.txt",
+		"/Users/chris/Documents/Church/Service.nosync/0 OoS.txt",
+		"/Users/chris/OneDrive - Birchwood Evangelical Church/Libraries/Quotes.md",
+		"/Users/chris/Library/Application Support/Postgres/var-13/pg_hba.conf",
+		"/Users/chris/Applications/scram_postgres_password.py",
+		"/usr/bin/python3",
+		"/Users/chris/.poetry/bin/poetry",
+		"/Users/chris/Source/Scratch/UmbracoCore/MyCustomUmbracoSolution/create-postgres-database.ps1",
+		"/Users/chris/Source/Scratch/builder/package-lock.json",
+		"/Users/chris/Source/Scratch/builder/package.json",
+		"/Users/chris/Source/Scratch/builder/README.md",
+		"/Users/chris/OneDrive/Other Research/Monitors 2021.txt",
+		"/Users/chris/Documents/Projects/Ascot Doors 2021/Ascot Doors.md",
+		"/Users/Shared/Relocated Items/Configuration/private/etc/group.system_default",
+		"/Users/Shared/Relocated Items/Configuration/private/etc/shells.system_default",
+		"/Users/chris/Desktop/BKF handover.md",
+		"/Volumes/GrowthCo/BKF/BKF notes.txt",
+		"/Volumes/GrowthCo/Website with Dan 2021 May.md",
+		"/Volumes/GrowthCo/Karen Notes.md",
+		"/Volumes/GrowthCo/Using a Kanban board.md",
+		"/Volumes/GrowthCo/terraform notes.md",
+		"/Volumes/GrowthCo/Sprint Plan.md",
+		"/Users/chris/Documents/Household/Pension/Funds 2021.txt",
+		"/Volumes/Chris/Chris Personal.txt",
+		"/Volumes/GCERepos/support-finder-api/Data/CreateDbScriptV2.sql",
+		"/Volumes/GrowthCo/Session 5.2 Who analysis.md",
+		"/Users/chris/Downloads/companies_house_document.xhtml",
+		"/Volumes/Chris/Business.txt",
+		"/Users/chris/OneDrive/My Notes/The Millionaire Paradox.md",
+		"/Users/chris/Documents/Church/Service in Encounter Notes 2021.md",
+		"/Volumes/GrowthCo/Draft Guesses for what we might build.md",
+		"/Volumes/GCERepos/bkf-create-database.ps1",
+		"/Volumes/GrowthCo/BKF/Scenarios for updating Resources for BKF.md",
+		"/Volumes/Chris/Self Employed.txt",
+		"/Users/chris/.subversion/config",
+		"/Users/chris/Applications/p4svn.sh",
+		"/Volumes/GrowthCo/BKF notes.txt",
+		"/Users/chris/Documents/Household/Water near us.txt",
+		"/Users/chris/Desktop/Victory.obs.json",
+		"/Volumes/GrowthCo/SP 2020-2023 snippets.md",
+		"/Volumes/GrowthCo/Microsoft Office Home.webloc",
+		"/Volumes/GrowthCo/Session 5 - Who.md",
+		"/Volumes/GrowthCo/6 Value of services.md",
+		"/Volumes/GrowthCo/Methodology Notes.md",
+		"/Volumes/GrowthCo/Notes on GC Business Plan.md",
+		"/Users/chris/Applications/Logs/rotate-logs.sh",
+		"/Users/chris/ovtr/ovtr.log",
+		"/Users/chris/ovtr/ovtr.properties",
+		"/Users/chris/lang/en_GB.lang",
+		"/Users/chris/MinecraftClient.ini",
+		"/Users/chris/tags",
+		"/Users/chris/Applications/tmbackupnow.sh",
+		"/Users/chris/Source/Scratch/wrangler/hello/wrangler.toml",
+		"/Users/chris/Documents/Projects/spf records.txt",
+		"/Users/chris/Downloads/Activity",
+		"/Users/chris/Desktop/notes Dom.md",
+		"/Users/chris/Downloads/unforgettable.me.uk.csv",
+		"/Users/chris/Desktop/DiskWarrior TM3.21 2021-Apr-17.md",
+		"/Users/chris/Desktop/DiskWarrior TM321.md",
+		"/Users/chris/Desktop/arch presentation Qs.md",
+		"/Users/chris/Desktop/TMI.txt",
+		"/Users/chris/Desktop/Layered Viewpoint.emf",
+		"/Users/chris/Downloads/sites",
+		"/Users/chris/Documents/Growthco/Richard Noon notes on Architecture.md",
+		"/Users/chris/Documents/Growthco/Session 4 Notes.md",
+		"/Users/chris/Documents/Projects/2021 Phil/Ascot Doors Brief.md",
+		"/Users/chris/Documents/Projects/2021 Phil/Phils Comments.txt",
+		"/Users/chris/Documents/Projects/2021 Notes/AO.txt",
+		"/Users/chris/Documents/Growthco/Session 1 Detail.txt",
+		"/Users/chris/Desktop/April 12 Mtg.txt",
+		"/Users/chris/Desktop/iMentor-bridgeall.txt",
+		"/Users/chris/Documents/Growthco/Layered.csv",
+		"/Users/chris/Downloads/story.html",
+		"/Users/chris/Applications/Logs/cafe-encounter-blog-backup.log",
+		"/Users/chris/Applications/cafe-encounter-blog-backup.sh",
+		"/Users/chris/Applications/iom-fetch-backup.sh",
+		"/Users/chris/Source/Repos/PythonPath/dedocker.py",
+		"/Users/chris/Source/Repos/VMs/DockerAlpineNet/Dockerfile",
+		"/Users/chris/Documents/Growthco/Sheron John David.txt",
+		"/Users/chris/Desktop/support finder.txt",
+		"/Users/chris/OneDrive/Other Research/monitors and webcams 2021.txt",
+		"/Users/chris/Desktop/Monitors.txt",
+		"/Users/chris/Source/3rd/mix.core/src/Mix.Cms.Web/Properties/launchSettings.json",
+		"/Users/chris/Source/3rd/mix.core/src/Mix.Cms.Web/web.config",
+		"/tmp/crontab.ABduiK4VjR",
+		"/Volumes/Chris/Business Technical.txt",
+		"/Users/chris/Desktop/Sheron John David.txt",
+		"/Users/chris/Documents/Warrington Software/Office/Tax and VAT Reference Numbers.txt",
+		"/Users/chris/Desktop/Business Planning with Amy and K.md",
+		"/Users/chris/Documents/Growthco/BGH Architecture KickOff.txt",
+		"/Users/chris/Desktop/BGH archimate.xml",
+		"/Users/chris/Desktop/BGH archimate 3.0 xsd.xml",
+		"/Users/chris/Desktop/layered xmi241.xml",
+		"/Users/chris/Desktop/Overview xmi2.xml",
+		"/Users/chris/Desktop/BGHArchimate xmi 2.1.xml",
+		"/Users/chris/Desktop/BGHArchimate layered.xml",
+		"/Users/chris/Desktop/BGHArchimate 1.1.xmi"
+	],
+	"find":
+	{
+		"height": 38.0
+	},
+	"find_in_files":
+	{
+		"height": 340.0,
+		"where_history":
+		[
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": true,
+		"replace_history":
+		[
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"sheets":
+			[
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 38.0
+	},
+	"input":
+	{
+		"height": 180.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.exec":
+	{
+		"height": 411.0
+	},
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"pinned_build_system": "",
+	"project": "ApplicationDatabases.sublime-project",
+	"replace":
+	{
+		"height": 72.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": false,
+	"show_open_files": true,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 211.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}
