@@ -112,7 +112,7 @@ function sanitiseAndAutocompleteParameters{
             "change it to lowercase letters and numbers with no punctuation."
     }
   }
-  $script:databaseOwner= [string]::IsNullOrWhiteSpace( $databaseOwner ) ? (qadd $databaseName "_owner") : $databaseOwner.ToLower()
+  $script:databaseOwner= [string]::IsNullOrWhiteSpace( $databaseOwner ) ? (qadd $databaseName "_dbowner") : $databaseOwner.ToLower()
   $script:appAccount= [string]::IsNullOrWhiteSpace( $appAccount ) ? $databaseName : $appAccount.ToLower()
   $script:readonlyAppAccount= [string]::IsNullOrWhiteSpace( $readonlyAppAccount ) ? (qadd $databaseName "_readonly") : $readonlyAppAccount.ToLower()
 }

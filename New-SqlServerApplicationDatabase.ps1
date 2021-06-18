@@ -42,11 +42,11 @@ Param(
   [string]$appLoginPassword,
   
   ##The name of the Login to Create having read access to the new database. Defaults to <databaseName>_readonly
-  [string]$readonlyAppLogin,
+  [string]$appReadonlyLogin,
   
   ##The password to use for -readonlyAppLogin. If none is given, one will be generated and displayed as the
   ##second or first line of output of this script.
-  [string]$readonlyAppLoginPassword,
+  [string]$appReadonlyLoginPassword,
   
   ##Leave this blank to use the server default language for the new logins
   [string]$loginLanguage,
@@ -78,7 +78,7 @@ Param(
   [string]$bootstrapSysAdminLogin,
 
   ## Delete the Database and the associated Roles
-  [switch][Alias("Down")]$deleteDatabaseAndRoles
+  [switch][Alias("Down")]$deleteDatabaseAndLogins
 )
 
 function sqlcmdGet($query, $db, [switch]$onErrorStop){
@@ -125,18 +125,18 @@ function sanitiseAndAutocompleteParameters{
   }
   $script:databaseOwner= [string]::IsNullOrWhiteSpace( $databaseOwner ) ? (qadd $databaseName "_owner") : $databaseOwner.ToLower()
   $script:appLogin= [string]::IsNullOrWhiteSpace( $appLogin ) ? $databaseName : $appLogin.ToLower()
-  $script:readonlyAppLogin= [string]::IsNullOrWhiteSpace( $readonlyAppLogin ) ? (qadd $databaseName "_readonly") : $readonlyAppLogin.ToLower()
+  $script:readonlyAppLogin= [string]::IsNullOrWhiteSpace( $appReadonlyLogin ) ? (qadd $databaseName "_readonly") : $appReadonlyLogin.ToLower()
 }
 function validateUpParametersElseForceDryRun{
 
-  $requireds= '$serverInstance','$databaseName','$databaseOwner','$appLogin','$readonlyAppLogin'
+  $requireds= '$serverInstance','$databaseName','$databaseOwner','$appLogin','$appReadonlyLogin'
   $invalid= $requireds.Where( {-not (Invoke-Expression $_)})
   if($invalid.Count){
     $script:dryRun=$true
     write-warning "dry running because you missed a parameter: $invalid"
   }
 
-  $identifiers= '$databaseName','$databaseOwner','$appLogin','$readonlyAppLogin'
+  $identifiers= '$databaseName','$databaseOwner','$appLogin','$appReadonlyLogin'
   $invalid= $identifiers.Where( {-not (isValidTSqlIdentifier (Invoke-Expression $_))})
   if($invalid.Count){
     $script:dryRun=$true
@@ -145,7 +145,7 @@ function validateUpParametersElseForceDryRun{
   }
 }
 function validateDownParametersElseForceDryRun{
-  $requireds= ('$serverInstance','$databaseName','$databaseOwner','$appLogin','$readonlyAppLogin')
+  $requireds= ('$serverInstance','$databaseName','$databaseOwner','$appLogin','$appReadonlyLogin')
   $invalids= $requireds | Where-Object { -not (Invoke-Expression $_) }
 
   if($invalid.Count){
@@ -154,7 +154,7 @@ function validateDownParametersElseForceDryRun{
   }
 }
 sanitiseAndAutocompleteParameters
-if($deleteDatabaseAndRoles){validateDownParametersElseForceDryRun}else{validateUpParametersElseForceDryRun}
+if($deleteDatabaseAndLogins){validateDownParametersElseForceDryRun}else{validateUpParametersElseForceDryRun}
 
 function New-Password([int]$length=12){ 
   1..($length * 3) |
@@ -165,17 +165,178 @@ function New-Password([int]$length=12){
 }
 
 function bootstrapDatabaseOwnerAndCILogin{
+  $ciadminPassword= (New-Password 30)
   $bootstrap=@"
     Use Master
-    If Not Exists (Select * from syslogins where name = '$ciLogin')
-        RaisError ('NOTE the ci Login does not yet exist', 1,1)
+    ;
+    Create Login ci With Password = `'$ciLoginPassword`'
+    ;
+    Create Certificate Login_ciadmin
+       Encryption By Password = `'$ciadminPassword`'
+       With Subject = 'Permission To Alter Authorization On Database',
+       Expiry_Date ='2299-01-01'
+    Create Login ciadmin From Certificate Login_ciadmin
 
-    Create Login ApplicationDatabaseOwner With Password = '$(New-Password 20)'
-    Alter Login Applicationdatabaseowner Disable
+    Alter Server Role sysadmin ADD MEMBER ciadmin;
 
-    Grant Impersonate On Login::Applicationdatabaseowner To $ciLogin
-    Grant Alter Any Login To $ciLogin
-    Grant Create Any Database To $ciLogin
+    Create Server Role Role_ci
+    Alter Server Role Role_ci Add Member ci
+    Go
+    ;
+    Create Schema ci
+    Go
+    ;
+    Use Master
+    Create User ci from Login ci
+    Revoke Execute on Schema::ci From Public;
+    Grant Execute On Schema::ci to ci
+    Go
+    ;
+    Create Or Alter Procedure Ci.CreateDatabaseWithOwner
+        @dbname nvarchar(128),
+        @dbowner nvarchar(128),
+        @appLogin nvarchar(128),
+        @appLoginPassword nvarchar(128),
+        @appReadonlyLogin nvarchar(128),
+        @appReadonlyLoginPassword nvarchar(128)
+    As
+    Begin
+        Declare @isCiLogin bit= (Select IS_SRVROLEMEMBER('Role_ci', SYSTEM_USER) |
+                                        IS_SRVROLEMEMBER('sysadmin', SYSTEM_USER))
+        If ISNULL(@isCiLogin,0)=0
+        Begin
+          Declare @msg nvarchar(128) = 'Current_User is not in Server Role Role_ci'
+          ; Throw 50000, @msg, 1 ;
+        End
+        Else
+        Begin
+          Declare @CreateDb nvarchar(max)
+          Declare @CreateDbUsers nvarchar(max)
+          Set @dbname=QuoteName(@dbname)
+          Set @Dbowner=QuoteName(@Dbowner)
+          Set @appLogin=QuoteName(@appLogin)
+          Set @appReadonlyLogin=QuoteName(@appReadonlyLogin)
+          Set @appLoginPassword=REPLACE(@appLoginPassword, '''', '''''')
+          Set @appReadonlyLoginPassword=REPLACE(@appReadonlyLoginPassword, '''', '''''')
+
+          Set @CreateDb = FormatMessage('
+              Begin Try Create Login %s With Password = ''''; Alter Login %s Disable; End Try Begin Catch Print Error_Message() End Catch
+              Begin Try Create Database %s; End Try Begin Catch Print Error_Message() End Catch
+              Alter Authorization On Database::%s TO %s;
+              Begin Try Create Login %s With Password= ''%s'', Default_Database= %s End Try Begin Catch Print Error_Message() End Catch
+              Begin Try Create Login %s With Password= ''%s'', Default_Database= %s End Try Begin Catch Print Error_Message() End Catch
+              ',
+                @Dbowner, @Dbowner,
+                @Dbname,
+                @Dbname, @Dbowner,
+                @appLogin, @appLoginPassword, @Dbname,
+                @appReadonlyLogin,@appReadonlyLoginPassword, @Dbname)
+
+          Set @Createdbusers=FORMATMESSAGE('
+              Use %s
+              Begin Try
+                Create User %s for Login %s
+                  Alter Role db_datareader Add Member %s
+                  Alter Role db_datawriter Add Member %s
+              End Try Begin Catch Print Error_Message() End Catch
+              Begin Try
+                Create User %s for Login %s
+                  Alter Role db_datareader Add Member %s
+              End Try Begin Catch Print Error_Message() End Catch
+              Begin Try
+                Create User %s for Login %s
+                  Alter Role db_owner Add Member %s
+              End Try Begin Catch Print Error_Message() End Catch',
+              @Dbname,
+                @appLogin,@appLogin,
+                  @appLogin,
+                  @appLogin,
+                @appReadonlyLogin, @appReadonlyLogin,
+                  @appReadonlyLogin,
+                SYSTEM_USER, SYSTEM_USER,
+                  SYSTEM_USER)
+
+          Print @Createdb
+          Execute sp_executesql @CreateDb
+
+          Print @Createdbusers
+          Execute sp_executesql @CreateDbUsers
+        End
+    End;
+    Go
+    ;
+    Add Signature To Ci.CreateDatabaseWithOwner
+      By Certificate Login_Ciadmin
+      With Password = `'$ciadminPassword`';
+    Go
+    ;
+    Create Or Alter Procedure Ci.DropDatabaseWithOwner
+        @dbname nvarchar(128),
+        @dbowner nvarchar(128),
+        @appLogin nvarchar(128),
+        @appReadonlyLogin nvarchar(128)
+    As
+    Begin
+        Set @dbname=QuoteName(@dbname)
+        Set @Dbowner=QuoteName(@Dbowner)
+        Set @appLogin=QuoteName(@appLogin)
+        Set @appReadonlyLogin=QuoteName(@appReadonlyLogin)
+
+        Declare @msg Nvarchar(max)
+        Declare @isCiLogin bit= (Select IS_SRVROLEMEMBER('Role_ci', SYSTEM_USER) |
+                                        IS_SRVROLEMEMBER('sysadmin', SYSTEM_USER))
+        Declare @tableCount int
+
+        Begin Try
+          If EXISTS(Select * from sysdatabases where QUOTENAME(Name)=@Dbname)
+          Begin
+            Declare @checkTables Nvarchar(max)=
+              FORMATMESSAGE('Select @rows=Count(*) from %s.Information_Schema.Tables',@Dbname)
+            Execute sp_executesql @checkTables, N'@rows int Output', @rows=@tableCount Output
+          End
+        End Try
+        Begin Catch
+            Throw
+    --       Set @msg= FORMATMESSAGE('Error attempting to check tables in %s',@Dbname)
+    --       ; Throw 50000, @msg, 1 ;
+        End Catch
+
+        If ISNULL(@isCiLogin,0)=0
+        Begin
+          Set @msg = 'Current_User is not in Server Role Role_ci'
+          ; Throw 50000, @msg, 1 ;
+        End
+        Else If @tableCount>0
+        Begin
+          Set @msg = FORMATMESSAGE('Won''t drop database %s because tables have been created.
+          First confirm no data will be lost, then drop the tables. Then you can Drop the database.',
+            @Dbname)
+          ; Throw 50000, @msg, 1 ;
+        End
+        Else
+        Begin
+          Declare @dropDb nvarchar(max)
+
+          Set @dropDb = FormatMessage('
+              Begin Try Drop Login %s End Try Begin Catch Print ERROR_MESSAGE() End Catch
+              Begin Try Drop Login %s End Try Begin Catch Print ERROR_MESSAGE() End Catch
+              Begin Try Drop Database %s End Try Begin Catch Print ERROR_MESSAGE() End Catch
+              Begin Try Drop Login %s End Try Begin Catch Print ERROR_MESSAGE() End Catch',
+                @appReadonlyLogin,
+                @appLogin,
+                @Dbname,
+                @Dbowner)
+
+          Print @dropDb
+          Execute sp_executesql @dropDb
+        End
+    End;
+    Go
+    ;
+    Add Signature To Ci.DropDatabaseWithOwner
+      By Certificate Login_Ciadmin
+      With Password = `'$ciadminPassword`';
+    Go
 "@
 
   if($dryRun){ "Bootstrap Logins for ApplicationDatabaseOwner and ci. 
@@ -185,12 +346,6 @@ function bootstrapDatabaseOwnerAndCILogin{
   }
 }
 
-function doesDatabaseOwnerExist{
-  $count=(getSQLScalar "Select Count(*) from master.dbo.syslogins Where name=`'$databaseOwner`'" "master")
-  $itExists= (1 -eq  [int]$count)
-  return $itExists
-}
-
 function Up{
 
   if(-not $appLoginPassword){
@@ -198,9 +353,9 @@ function Up{
     $appLoginPassword
     $didGeneratePassword=$true
   }
-  if(-not $readonlyAppLoginPassword){
-    $readonlyAppLoginPassword= New-Password 20
-    $readonlyAppLoginPassword
+  if(-not $appReadonlyLoginPassword){
+    $appReadonlyLoginPassword= New-Password 20
+    $appReadonlyLoginPassword
     $didGeneratePassword=$true
   }
 
@@ -210,80 +365,50 @@ function Up{
 You did not provide passwords, so passwords were generated with Get-Random and shown above this line."
   }
 
-  if($databaseOwner -and -not (doesDatabaseOwnerExist))
-  {
-    Write-Warning "
-    You specified databaseOwner $databaseOwner but that login does not exist on the server.
-    First, run this script interactively with the -bootstrapSysAdminLogin set to a sysadmin login to
-    create the databaseOwner role and to Grant Impersonate on it to the $ciLogin.
-    "
-    throw "databaseOwner Login $databaseOwner does not exist on server $serverInstance."
-  }
-
   $collationClause= ($collation) ? "With COLLATE $collation" : ""
   $languageClause= ($loginLanguage) ? ", Default_Language=$loginLanguage" : ""
-  if($databaseOwner){
-    $databaseOwnerLine= "Alter Authorization ON database::$databaseName TO $databaseOwner ;"
-    $executeAs= "Execute As Login=`'$databaseOwner`'
-GO
-"
-  }
+  $databaseOwner= ($databaseOwner) ? $databaseOwner : $ciLogin
+
   "
 -----------------------------------------------------
   Will log in to Server=$serverInstance as User $($ciLogin ?? "(Integrated Security)") to create:
   
     Database=$databaseName $collationClause
     with
-    database Owner=$(($databaseOwner) ? $databaseOwner : $ciLogin)
+    database Owner=$databaseOwner
     application Login=$appLogin $languageClause
-    application readonly login=$readonlyAppLogin $languageClause
+    application readonly login=$appReadonlyLogin $languageClause
     Passwords generate by: $(if($didGeneratePassword){"This script"}else{"You"})
 -----------------------------------------------------
 
 starting ...
 "
  
-  runOrDryRun @"
-    CREATE DATABASE $databaseName $collationClause ;
-    Create Login $appLogin With Password = `'$appLoginPassword`' $languageClause 
-                 , Default_Database=$databaseName ;
-    Create Login $readonlyAppLogin With Password =`'$readonlyAppLoginPassword`' $languageClause 
-                 , Default_Database=$databaseName ;
-    $databaseOwnerLine
-"@  'master'
-
-  runOrDryRun @"
-    $executeAs
-
-    Use $databaseName
-
-    Create User $appLogin For Login $appLogin With Default_Schema=dbo;
-    Create User $readonlyAppLogin For Login $readonlyAppLogin With Default_Schema=dbo;
-    Create User $ciLogin For Login $ciLogin With Default_Schema=dbo;
-    Alter Role db_owner Add Member $ciLogin ;
-    Alter Role db_datareader Add Member $appLogin ;
-    Alter Role db_datawriter Add Member $appLogin ;
-    Alter Role db_datareader Add Member $readonlyAppLogin ;
-"@  'master'
-
+  runOrDryRun "Execute master.Ci.CreateDatabaseWithOwner
+          @dbname  = `'$databaseName`',
+          @dbowner = `'$databaseOwner`',
+          @appLogin = `'$appLogin`',
+          @appLoginPassword = `'$appLoginPassword`',
+          @appReadonlyLogin = `'$appReadonlyLogin`',
+          @appReadonlyLoginPassword = `'$appReadonlyLoginPassword`'
+        -- TODO : collationClause, languageClause
+    "  'master'
 }
 
 function Down{
-
+  
   "-----------------------------------------------------
   Will log in to Server=$serverInstance as User $($ciLogin ?? "(Integrated Security)") to Drop Database and Logins:
     
+      database=$databaseName
       database Owner=$databaseOwner
       Application Login=$appLogin
-      Application Readonly Login=$readonlyAppLogin
+      Application Readonly Login=$appReadonlyLogin
 
   -----------------------------------------------------
 
   starting ...
-"
-$executeAs= ($databaseOwner) ? "Execute As Login=`'$databaseOwner`'
-GO
-" : ""
+  "
 
   $dbExists=[int](getSQLScalar "Select Count(*) from master..sysdatabases where name = `'$databaseName`'" "master")
   if($dbExists){
@@ -296,19 +421,12 @@ GO
   }
   else
   {
-    runOrDryRun @"
-      If Exists (Select * from master..syslogins where name='$appLogin') 
-         Drop Login $appLogin
-         Else Begin Print 'Login $appLogin already gone.' End;
-      If Exists (Select * from master..syslogins where name='$readonlyAppLogin')
-         Drop Login $readonlyAppLogin
-         Else Begin Print 'Login $readonlyAppLogin already gone.' End ;
-
-      $executeAs
-      If Exists (Select * from master..sysdatabases where name='$databaseName')
-        Drop Database $databaseName
-        Else Begin Print 'Database $databaseName already gone.' End;
-"@ 'master'
+    runOrDryRun "Execute Master.Ci.DropDatabaseWithOwner
+        @dbname = `'$databaseName`',
+        @dbowner = `'$databaseOwner`',
+        @appLogin = `'$appLogin`',
+        @appReadonlyLogin = '$appReadonlyLogin`',
+      " 'master'
   }
 }
 
@@ -316,7 +434,7 @@ if($bootstrapSysAdminLogin)
 {
   bootstrapDatabaseOwnerAndCILogin
 }
-elseif($deleteDatabaseAndRoles)
+elseif($deleteDatabaseAndLogins)
 {
   Down
 }

@@ -4,6 +4,10 @@
 		"selected_items":
 		[
 			[
+				"ci",
+				"ciLogin"
+			],
+			[
 				"help",
 				"helpFull"
 			],
@@ -510,10 +514,6 @@
 			[
 				"did",
 				"didSpecifyMoreParameters"
-			],
-			[
-				"att",
-				"attachFolder"
 			]
 		]
 	},
@@ -603,6 +603,7 @@
 	],
 	"file_history":
 	[
+		"/Users/chris/Documents/Household/Pension/Aviva Pension Plan 2021.md",
 		"/Users/chris/Source/Repos/ApplicationDatabases/New-SqlServerApplicationDatabase.ps1",
 		"/Users/chris/.config/chris/secrets.fish",
 		"/Users/chris/.config/chris/secrets.ps1",
@@ -729,18 +730,18 @@
 		"/Users/chris/Desktop/layered xmi241.xml",
 		"/Users/chris/Desktop/Overview xmi2.xml",
 		"/Users/chris/Desktop/BGHArchimate xmi 2.1.xml",
-		"/Users/chris/Desktop/BGHArchimate layered.xml",
-		"/Users/chris/Desktop/BGHArchimate 1.1.xmi"
+		"/Users/chris/Desktop/BGHArchimate layered.xml"
 	],
 	"find":
 	{
-		"height": 38.0
+		"height": 50.0
 	},
 	"find_in_files":
 	{
 		"height": 340.0,
 		"where_history":
 		[
+			""
 		]
 	},
 	"find_state":
@@ -748,6 +749,7 @@
 		"case_sensitive": false,
 		"find_history":
 		[
+			"bootstrap"
 		],
 		"highlight": true,
 		"in_selection": false,
@@ -813,7 +815,7 @@
 	"project": "ApplicationDatabases.sublime-project",
 	"replace":
 	{
-		"height": 72.0
+		"height": 92.0
 	},
 	"save_all_on_build": true,
 	"select_file":
@@ -827,12 +829,16 @@
 	},
 	"select_project":
 	{
-		"height": 0.0,
+		"height": 500.0,
 		"last_filter": "",
 		"selected_items":
 		[
+			[
+				"",
+				"/Volumes/GCERepos/shared-services.sublime-project"
+			]
 		],
-		"width": 0.0
+		"width": 380.0
 	},
 	"select_symbol":
 	{
@@ -851,7 +857,7 @@
 	"show_open_files": true,
 	"show_tabs": true,
 	"side_bar_visible": true,
-	"side_bar_width": 211.0,
+	"side_bar_width": 257.0,
 	"status_bar_visible": true,
 	"template_settings":
 	{
