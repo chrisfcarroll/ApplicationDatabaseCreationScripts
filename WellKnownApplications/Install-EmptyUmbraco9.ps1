@@ -1,6 +1,4 @@
-#! /usr/bin/env pwsh
-# The one-liner above marks this for unix shells as runnable in powershell. 
-# But: you still have to chmod it to be executable from a bash or fish or other shell
+#! /usr/bin/env pwsh # nb you still have to chmod this file to run from a unix shell
 Param(
   [string]$installerName="Installer",
   [Parameter(Mandatory=$true)][string]$installerPassword,
