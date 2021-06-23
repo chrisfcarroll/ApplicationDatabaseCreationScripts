@@ -18,6 +18,7 @@
   https://github.com/chrisfcarroll/ApplicationDatabases
 
 #>
+ [CmdletBinding(DefaultParameterSetName = 'Run')]
 Param(
   ##A name for the new database
   [string][ValidatePattern('(".+"|[^"]+)')]$databaseName="appname",
@@ -35,24 +36,24 @@ Param(
 
   ##The name of the Login to Create having read & write access to the new database. Defaults
   ##to the same as -databaseName
-  [string]$appLogin,
+  [string][Parameter(ParameterSetName='Run')]$appLogin,
   
   ##The password to use for -appLogin. If not is given, one will be generated and displayed as the
   ##first line of output of this script.
-  [string]$appLoginPassword,
+  [string][Parameter(ParameterSetName='Run')]$appLoginPassword,
   
   ##The name of the Login to Create having read access to the new database. Defaults to <databaseName>_readonly
-  [string]$appReadonlyLogin,
+  [string][Parameter(ParameterSetName='Run')]$appReadonlyLogin,
   
   ##The password to use for -readonlyAppLogin. If none is given, one will be generated and displayed as the
   ##second or first line of output of this script.
-  [string]$appReadonlyLoginPassword,
+  [string][Parameter(ParameterSetName='Run')]$appReadonlyLoginPassword,
   
   ##Leave this blank to use the server default language for the new logins
-  [string]$loginLanguage,
+  [string][Parameter(ParameterSetName='Run')]$loginLanguage,
 
   ## Leave this blank to use the server default collation for the new database
-  [string]$collation,
+  [string][Parameter(ParameterSetName='Run')]$collation,
 
   ##If set, the SQL scripts will be echoed but not run
   [switch]$dryRun,
@@ -71,14 +72,22 @@ Param(
   ##
   ##See https://docs.microsoft.com/en-us/sql/t-sql/statements/alter-authorization-transact-sql#best-practice
   ##on the idea of using a Disabled Login as the database Owner. 
-  [string]$databaseOwner='ApplicationDatabaseOwner',
+  [string][Parameter(ParameterSetName='Run')]$databaseOwner='ApplicationDatabaseOwner',
   
-  ##A sysadmin login that can bootstrap the -databaseOwner Login. Run this once per server to create a 
-  ## databaseOwner Login, which will be disabled, and which can be used as an owner for application databases.
-  [string]$bootstrapSysAdminLogin,
-
   ## Delete the Database and the associated Roles
-  [switch][Alias("Down")]$deleteDatabaseAndLogins
+  [switch][Parameter(ParameterSetName='Run')][Alias("Down")]$deleteDatabaseAndLogins,
+
+  ##A sysadmin login that can bootstrap the scripts for ci database handover. Run this once per server to create a 
+  ## databaseOwner Login, which will be disabled, and which can be used as an owner for application databases.
+  [Parameter(ParameterSetName='Bootstrap')][string]$saLogin,
+
+  ##Password for -saLogin, which defaults to Env:\SQLCMDPASSWORD
+  [Parameter(ParameterSetName='Bootstrap')][string]$saLoginPassword=$env:SQLCMDPASSWORD,
+
+  [Parameter(ParameterSetName='Bootstrap')][switch]$bootstrap,
+
+  [Parameter(ParameterSetName='Bootstrap')][switch]$uninstallBootstrap
+
 )
 
 function sqlcmdGet($query, $db, [switch]$onErrorStop){
@@ -153,8 +162,17 @@ function validateDownParametersElseForceDryRun{
     write-warning "dry running because you missed a parameter: $([string]::Join(", ", $invalids))"
   }
 }
-sanitiseAndAutocompleteParameters
-if($deleteDatabaseAndLogins){validateDownParametersElseForceDryRun}else{validateUpParametersElseForceDryRun}
+function validateBootstrapParametersElseForceDryRun{
+  $requireds= ('$serverInstance','$ciLogin','$saLogin')
+  $invalids= $requireds | Where-Object { -not (Invoke-Expression $_) }
+
+  if($invalid.Count){
+    $script:dryRun=$true
+    write-warning "dry running because you missed a parameter: $([string]::Join(", ", $invalids))"
+  }
+}
+
+
 
 function New-Password([int]$length=12){ 
   1..($length * 3) |
@@ -164,9 +182,9 @@ function New-Password([int]$length=12){
           ForEach-Object {$agg=""} {$agg += $_} {$agg} 
 }
 
-function bootstrapDatabaseOwnerAndCILogin{
+function bootstrapCiDatabaseHandover{
   $ciadminPassword= (New-Password 30)
-  $bootstrap=@"
+  $bootstrap1=@"
     Use Master
     ;
     Create Login ci With Password = `'$ciLoginPassword`'
@@ -191,8 +209,10 @@ function bootstrapDatabaseOwnerAndCILogin{
     Revoke Execute on Schema::ci From Public;
     Grant Execute On Schema::ci to ci
     Go
-    ;
-    Create Or Alter Procedure Ci.CreateDatabaseWithOwner
+"@
+
+  $bootstrap2=@"
+        Create Or Alter Procedure Ci.CreateDatabaseWithOwner
         @dbname nvarchar(128),
         @dbowner nvarchar(128),
         @appLogin nvarchar(128),
@@ -339,14 +359,31 @@ function bootstrapDatabaseOwnerAndCILogin{
     Go
 "@
 
-  if($dryRun){ "Bootstrap Logins for ApplicationDatabaseOwner and ci. 
-                This script must be run once with a sysadmin login.:`n$bootstrap" }
-  else{
-    sqlcmd -S $serverInstance -d master -U $bootstrapSysAdminLogin -e -X -j -Q $bootstrap
-  }
+  runOrDryRun $bootstrap1 'master' -login $saLogin -password $saLoginPassword `
+    &&
+      runOrDryRun $bootstrap2 'master' -login $saLogin -password $saLoginPassword `
 }
 
-function Up{
+function uninstallBootstrap {
+  $uninstall=@"
+    Drop Procedure ci.CreateDatabaseWithOwner
+    Drop Procedure ci.DropDatabaseWithOwner
+    Drop schema ci
+    Drop user ci
+    Alter Server Role Role_ci Drop Member ci
+    Drop Server Role Role_ci
+    Drop Login ciadmin
+    Drop Certificate Login_ciadmin
+    Drop Login ci
+"@
+
+  "Uninstalling Application Database Procedures and ci schema, server role, login, certificate."
+
+  runOrDryRun $uninstall 'master' -login $saLogin -password $saLoginPassword
+
+}
+
+function Up {
 
   if(-not $appLoginPassword){
     $appLoginPassword= New-Password 20
@@ -430,15 +467,24 @@ function Down{
   }
 }
 
-if($bootstrapSysAdminLogin)
+sanitiseAndAutocompleteParameters
+
+if($uninstallBootstrap){
+  validateBootstrapParametersElseForceDryRun
+  uninstallBootstrap
+}
+elseif($bootstrap)
 {
-  bootstrapDatabaseOwnerAndCILogin
+  validateBootstrapParametersElseForceDryRun
+  bootstrapCiDatabaseHandover
 }
 elseif($deleteDatabaseAndLogins)
 {
+  validateDownParametersElseForceDryRun
   Down
 }
 else
 {
+  validateUpParametersElseForceDryRun
   Up
 }
