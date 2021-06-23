@@ -41,12 +41,14 @@ ORDER  BY rp.name,
           rp.type_desc,
           pm.class_desc
 
+-- Work out what rights have been granted by ...
+
 SELECT class_desc,*
 FROM sys.server_permissions
 WHERE grantor_principal_id = (
     SELECT principal_id
     FROM sys.server_principals
-        WHERE NAME = N'appname_owner')
+        WHERE NAME = N'applicationdatabaseowner')
 
 SELECT NAME, type_desc
 FROM sys.server_principals
@@ -56,7 +58,9 @@ WHERE principal_id IN (
         WHERE grantor_principal_id = (
             SELECT principal_id
             FROM sys.server_principals
-            WHERE NAME = N'appname_owner'))
+            WHERE NAME = N'applicationdatabaseowner'))
+
+-- Db roles
 
 SELECT DP1.name AS DatabaseRoleName, IsNull(DP2.name, 'No members') AS DatabaseUserName
  FROM sys.database_role_members AS DRM

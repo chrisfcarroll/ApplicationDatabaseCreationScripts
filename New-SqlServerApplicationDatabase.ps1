@@ -38,6 +38,11 @@ Param(
   ##to the same as -databaseName
   [string][Parameter(ParameterSetName='Run')]$appLogin,
   
+  ##If true, then the -appLogin's user in the database will be made a member of the owner group.
+  ##Use this for applications that use one login both for application database initialisation and
+  ##for running the application.
+  [switch][Parameter(ParameterSetName='Run')]$appLoginIsDbOwner,
+
   ##The password to use for -appLogin. If not is given, one will be generated and displayed as the
   ##first line of output of this script.
   [string][Parameter(ParameterSetName='Run')]$appLoginPassword,
@@ -75,7 +80,7 @@ Param(
   [string][Parameter(ParameterSetName='Run')]$databaseOwner='ApplicationDatabaseOwner',
   
   ## Delete the Database and the associated Roles
-  [switch][Parameter(ParameterSetName='Run')][Alias("Down")]$deleteDatabaseAndLogins,
+  [switch][Parameter(ParameterSetName='Run')][Alias("Down")][Alias("dropDatabaseAndLogins")]$deleteDatabaseAndLogins,
 
   ##A sysadmin login that can bootstrap the scripts for ci database handover. Run this once per server to create a 
   ## databaseOwner Login, which will be disabled, and which can be used as an owner for application databases.
@@ -115,7 +120,7 @@ if($help){ Get-Help $PSCommandPath ; Exit}
 function isQuoted([string]$str){return $str -like '`[*`]'}
 function quote([string]$str){return ((isQuoted $str) ? $str : '['+$str+']') }
 function unQuote([string]$str){return ((isQuoted $str) ? $str.Substring(1,$str.Length-2) : $str) }
-$validTSqlIdentifier='^[_\p{Ll}][_\p{Ll}\p{Mn}\d]*$'
+$validTSqlIdentifier='^[_@#\p{L}][$_@#\p{L}\d]*$'
 
 function isValidTSqlIdentifier([string]$str){return ($str -cmatch $validTSqlIdentifier) -or ($str -like '`[*`]') }
 
@@ -218,7 +223,8 @@ function bootstrapCiDatabaseHandover{
         @appLogin nvarchar(128),
         @appLoginPassword nvarchar(128),
         @appReadonlyLogin nvarchar(128),
-        @appReadonlyLoginPassword nvarchar(128)
+        @appReadonlyLoginPassword nvarchar(128),
+        @appLoginIsDbOwner int = 0
     As
     Begin
         Declare @isCiLogin bit= (Select IS_SRVROLEMEMBER('Role_ci', SYSTEM_USER) |
@@ -258,6 +264,7 @@ function bootstrapCiDatabaseHandover{
                 Create User %s for Login %s
                   Alter Role db_datareader Add Member %s
                   Alter Role db_datawriter Add Member %s
+                  If %i = 1 Begin Alter Role db_owner Add Member %s End
               End Try Begin Catch Print Error_Message() End Catch
               Begin Try
                 Create User %s for Login %s
@@ -268,9 +275,10 @@ function bootstrapCiDatabaseHandover{
                   Alter Role db_owner Add Member %s
               End Try Begin Catch Print Error_Message() End Catch',
               @Dbname,
-                @appLogin,@appLogin,
+                @appLogin, @appLogin,
                   @appLogin,
                   @appLogin,
+                  @appLoginIsDbOwner, @appLogin,
                 @appReadonlyLogin, @appReadonlyLogin,
                   @appReadonlyLogin,
                 SYSTEM_USER, SYSTEM_USER,
@@ -405,6 +413,7 @@ You did not provide passwords, so passwords were generated with Get-Random and s
   $collationClause= ($collation) ? "With COLLATE $collation" : ""
   $languageClause= ($loginLanguage) ? ", Default_Language=$loginLanguage" : ""
   $databaseOwner= ($databaseOwner) ? $databaseOwner : $ciLogin
+  $appLoginIsDbOwnerN= $appLoginIsDbOwner ? 1 : 0 
 
   "
 -----------------------------------------------------
@@ -415,19 +424,21 @@ You did not provide passwords, so passwords were generated with Get-Random and s
     database Owner=$databaseOwner
     application Login=$appLogin $languageClause
     application readonly login=$appReadonlyLogin $languageClause
+    application login is dbowner= $appLoginIsDbOwner
     Passwords generate by: $(if($didGeneratePassword){"This script"}else{"You"})
 -----------------------------------------------------
 
 starting ...
 "
- 
+  
   runOrDryRun "Execute master.Ci.CreateDatabaseWithOwner
           @dbname  = `'$databaseName`',
           @dbowner = `'$databaseOwner`',
           @appLogin = `'$appLogin`',
           @appLoginPassword = `'$appLoginPassword`',
           @appReadonlyLogin = `'$appReadonlyLogin`',
-          @appReadonlyLoginPassword = `'$appReadonlyLoginPassword`'
+          @appReadonlyLoginPassword = `'$appReadonlyLoginPassword`',
+          @appLoginIsDbOwner = $appLoginIsDbOwnerN
         -- TODO : collationClause, languageClause
     "  'master'
 }
@@ -462,7 +473,7 @@ function Down{
         @dbname = `'$databaseName`',
         @dbowner = `'$databaseOwner`',
         @appLogin = `'$appLogin`',
-        @appReadonlyLogin = '$appReadonlyLogin`',
+        @appReadonlyLogin = `'$appReadonlyLogin`'
       " 'master'
   }
 }
