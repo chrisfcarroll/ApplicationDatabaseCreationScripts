@@ -1,28 +1,63 @@
 #! /usr/bin/env pwsh # nb you still have to chmod this file to run from a unix shell
+
+<#
+  .SYNOPSIS
+  Run an unattended install of Umbraco 9, specifying installer and database details, 
+  creating both an AspNetCore web application and initialising the given database.
+  
+   .DESCRIPTION
+  Run an unattended install of Umbraco 9, specifying installer and database details.
+
+  - The databaseName to be used must already exist on the -dbServer
+  - The applicationDbUserId must have access and DDL permissions in the database
+
+  This script will create a new AspNetCore Umbraco9 web application using the currently
+  installed dotnet new umbraco template.The web application will in turn initialise 
+  the database.
+
+  .LINK
+  https://github.com/chrisfcarroll/ApplicationDatabases/WellKnownApplications
+  https://our.umbraco.com/Documentation/Fundamentals/Setup/Install/Unattended-Install-v9
+
+#>
+
+
 Param(
   [string]$installerName="Installer",
-  [Parameter(Mandatory=$true)][string]$installerPassword,
   [Parameter(Mandatory=$true)][ValidateScript(
     {try{[System.Net.Mail.MailAddress]$_;return $true;}catch{return $false}})]
   [string]$installerEmail,
+  [Parameter(Mandatory=$true)][string]$installerPassword,
   [string]$dbServer=$env:SQLCMDSERVER,
-  [string]$dbDatabaseName="Umbraco",
+  [string]$databaseName="Umbraco",
   [string]$applicationDbUserId="Umbraco",
   [Parameter(Mandatory=$true)][string]$applicationDbPassword,
   [string]$csprojName="Umbraco9",
   [string]$csprojOutputDir,
   [string]$connectionString,
-  [int]$connectionTimeoutSecs=3
+  [int]$connectionTimeoutSecs=3,
+
+  ##Shows help, then stop.
+  [switch]$help,
+
+  ##Shows full help, then stop.
+  [switch]$helpFull
   )
+
+if(-not $installerName){ $help=$true }
+
+if($helpFull){ Get-Help $PSCommandPath ; Get-Help $PSCommandPath -Parameter '*' ; Exit }
+if($help){ Get-Help $PSCommandPath ; Exit}
+
 
 function validateParametersElseThrow{
 
   if(-not $connectionString){
-    $requireds= ('$dbServer','$dbDatabaseName','$applicationDbUserId','$applicationDbPassword')
+    $requireds= ('$dbServer','$databaseName','$applicationDbUserId','$applicationDbPassword')
     $invalids= $requireds | Where-Object { -not (Invoke-Expression $_) }
     if($invalid.Count){throw "You missed a parameter: $([string]::Join(", ", $invalids))"}
     $script:connectionString= `
-      "Server=$dbServer;database=$dbDatabaseName;user id=$applicationDbUserId;password=$applicationDbPassword;Connection Timeout=$connectionTimeoutSecs"
+      "Server=$dbServer;database=$databaseName;user id=$applicationDbUserId;password=$applicationDbPassword;Connection Timeout=$connectionTimeoutSecs"
   }
   $script:csprojOutputDir= $csprojOutputDir ? $csprojOutputDir :$csprojName
 }
