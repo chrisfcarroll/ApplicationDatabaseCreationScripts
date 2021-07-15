@@ -27,9 +27,10 @@ Param(
   ##the Locale you choose must be supported by the Operating System that the postgres instance is running on.
   [string]$dbLocale,
   ##The postgres Host you wish to target
-  [string][Alias('H')]$postgresHost="localhost",
-  ##The postgres username to login with to run this script. Defaults to the OS username running this script.
-  [string][Alias('U')]$adminUser=[Environment]::UserName,
+  [string][Alias('H')]$postgresHost,
+  ##The postgres username to login with and to set as the owner of the recreated template1.
+  ##Defaults to postgres
+  [string][Alias('U')]$user='postgres',
   ##The encoding to set. Leave this at UTF-8 for simple worldwide compatibility
   [string]$dbEncoding='UTF-8',
   ##If set the extension uuid-ossp will be added, to add uuid functions to the database
@@ -48,14 +49,24 @@ Param(
   [switch]$helpAvailableLocales
 )
 
-function runOrDryRun($command, $db, [switch]$onErrorStop){
-  if($dryRun){ "-d $db :\n$command" }
-  else{
-    $command | psql -v ON_ERROR_STOP=$(if($onErrorStop){1}else{0}) -X --echo-all `
-          --host=$postgresHost -d $db -U $adminUser
-    return $?
-  }
+# -----------------------------------------
+function help{ Get-Help $PSCommandPath }
+if($help){help; Exit}
+
+function helpAvailableLocales{ [CultureInfo]::GetCultures( [CultureTypes]::AllCultures ) }
+if($helpAvailableLocales){helpAvailableLocales; Exit}
+
+function validateParametersElseForceDryRun{
+    $invalid= ('$postgresHost','$dbLocale','$dbEncoding','$user').Where(
+        {-not $ExecutionContext.InvokeCommand.ExpandString($_)})
+    if($invalid.Count){
+      $script:dryRun=$true
+      write-warning "dry running because you missed a parameter: $invalid"
+    }
 }
+validateParametersElseForceDryRun
+
+
 function defaultLocaleForLocalhost{
   $lc= if($IsWindows){ 
     (Get-UICulture).Name
@@ -69,30 +80,26 @@ if(-not $dbLocale)
   $dbLocale=defaultLocaleForLocalhost
   "Detected localhost locale as $dbLocale."
   if($postgresHost -ne 'localhost' -and $postgresHost -ne '127.0.0.1'){
-    throw "When connecting to a remote server, you must specify the locale. It can only be auto-detected on localhost."
+    write-warning "When connecting to a remote server, you must specify the locale. It can only be auto-detected on localhost."
+    Exit
   }
 }
 
-function validateParametersElseForceDryRun{
-    $invalid= ('$postgresHost','$dbLocale','$dbEncoding','$adminUser').Where(
-        {-not $ExecutionContext.InvokeCommand.ExpandString($_)})
-    if($invalid.Count){
-      $script:dryRun.IsPresent=$true
-      write-warning "dry running because you missed a parameter: $invalid"
-    }
+# -----------------------------------------
+
+function runOrDryRun($command, $db, [switch]$onErrorStop){
+  if($dryRun){ "-d $db :\n$command" }
+  else{
+    $command | psql -v ON_ERROR_STOP=$(if($onErrorStop){1}else{0}) -X --echo-all `
+          --host=$postgresHost -d $db -U $user
+    return $?
+  }
 }
-validateParametersElseForceDryRun
-
-function help{ Get-Help $PSCommandPath ; Get-Help $PSCommandPath -Parameter '*' }
-if($help){help; Exit}
-function helpAvailableLocales{ [CultureInfo]::GetCultures( [CultureTypes]::AllCultures ) }
-if($helpAvailableLocales){helpAvailableLocales; Exit}
-
 
 
 "
 -----------------------------------------------------
-  Will log in to Host=$postgresHost as user=$adminUser to Drop then Create template Database template1:
+  Will log in to Host=$postgresHost as user=$user to Drop then Create template Database template1:
   
     with
     Encoding=$dbEncoding
@@ -110,9 +117,8 @@ runOrDryRun @"
     ALTER database template1 is_template=false;
     DROP database template1;
     CREATE DATABASE template1
-    WITH OWNER = postgres
+    WITH 
        ENCODING = '$dbEncoding'
-       TABLESPACE = pg_default
        LC_COLLATE = '$dbLocale'
        LC_CTYPE = '$dbLocale'
        CONNECTION LIMIT = -1
@@ -161,8 +167,8 @@ if($addPlv8){
   
     if(-not $?){
       write-warning "Create Extension plv8 failed. Trying to first install to db=postgres"
-      'Create Extension If Not Exists "plv8" ;' | psql --host=$postgresHost -d postgres -U $adminUser -X --echo-all
-      'Create Extension If Not Exists "plv8" ;' | psql --host=$postgresHost -d lb -U $adminUser -X --echo-all
+      'Create Extension If Not Exists "plv8" ;' | psql --host=$postgresHost -d postgres -U $user -X --echo-all
+      'Create Extension If Not Exists "plv8" ;' | psql --host=$postgresHost -d lb -U $user -X --echo-all
   
       if(-not $?){
         write-warning "Create Extension plv8 failed. Trying to install plv8 to your postgres instance"
