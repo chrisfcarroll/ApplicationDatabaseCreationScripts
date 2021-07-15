@@ -28,8 +28,8 @@ Param(
   [string][ValidatePattern('(".+"|^[_\p{Ll}][_\p{Ll}\p{Mn}\d]*$)')]$databaseName="appname",
   ##The postgres Host you wish to target
   [string][Alias('H')]$postgresHost="localhost",
-  ##The postgres username to login with to run this script. Defaults to the OS username running this script.
-  [string][Alias('U')]$adminUser=[Environment]::UserName,
+  ##The postgres username to login with to run this script. Defaults to $env:PGUSER.
+  [string][Alias('U')]$user=$env:PGUSER,
   ##The name of the Role to create to own the new database
   [string]$databaseOwner,
   ##The name of the Role to Create having read & write access to the new database
@@ -78,7 +78,7 @@ function runOrDryRun($command, $db, [switch]$onErrorStop){
   if($dryRun){ "-d $db :`n$command" }
   else{
     $r= ($command | psql -v ON_ERROR_STOP=$(if($onErrorStop){'ON'}else{'OFF'}) -X --echo-all `
-          --host=$postgresHost -d $db -U $adminUser)
+          --host=$postgresHost -d $db -U $user)
     return $? ? $r : $?
   }
 }
@@ -118,7 +118,7 @@ function sanitiseAndAutocompleteParameters{
 }
 function validateUpParametersElseForceDryRun{
 
-  $requireds= '$postgresHost','$databaseName','$databaseOwner','$appAccount','$readonlyAppAccount','$adminUser'
+  $requireds= '$postgresHost','$databaseName','$databaseOwner','$appAccount','$readonlyAppAccount','$user'
   $invalid= $requireds.Where( {-not (Invoke-Expression $_)})
   if($invalid.Count){
     $script:dryRun=$true
@@ -227,7 +227,7 @@ You did not provide passwords, so passwords were created and shown above this li
 
   "
 -----------------------------------------------------
-  Will log in to Host=$postgresHost as User=$adminUser to create:
+  Will log in to Host=$postgresHost as User=$user to create:
   
     Database= $databaseName 
     with
@@ -318,7 +318,7 @@ starting ...
 function Down{
 
   "-----------------------------------------------------
-  Will log in to Host=$postgresHost as User=$adminUser to Drop Database and Roles:
+  Will log in to Host=$postgresHost as User=$user to Drop Database and Roles:
     
       database Owner=$databaseOwner
       Application Login=$appAccount
@@ -328,7 +328,7 @@ function Down{
 
   starting ...
 "
-$dbExists= (psql -l | select-string "^\s$(unQuote $databaseName)\s+\|\s+") -and $true
+$dbExists= $dryRun -or (psql -l -h $postgresHost -U $user | select-string "^\s$(unQuote $databaseName)\s+\|\s+")
 $tablesExist= $dbExists -and -not (runOrDryRun @"
     Do `$`$
     Begin
@@ -348,7 +348,7 @@ $tablesExist= $dbExists -and -not (runOrDryRun @"
     runOrDryRun @"
       Revoke all On Database $databaseName from $appAccount ;
       Revoke all On Database $databaseName from $readonlyAppAccount ;
-      Alter Database $databaseName Owner to $adminUser ; 
+      Alter Database $databaseName Owner to $user ; 
       Drop role $appAccount ;
       Drop role $readonlyAppAccount ;
       Drop role $databaseOwner ;
