@@ -9,11 +9,18 @@
   defm remove [options]
   defm up
   defm up <name>
+  defm up <from> <to>
+  defm script
+
+  To see options for each command, use defm <command> -help
   
    .DESCRIPTION
+
+   Note that dotnet ef migrations has no down command. Instead, use list to see migration
+   names, and use up <name> to go down. You can always use up 0 to go down to initial database.
    
   .LINK
-  https://learn.microsoft.com/en-us/ef/core/cli/dotnet#aspnet-core-environment
+  https://learn.microsoft.com/en-us/ef/core/cli/dotnet#using-the-tools
 
 #>
 
@@ -23,11 +30,11 @@ param(  [ValidateSet(
           'up',
           'down',
           'remove',
-          'script-only',
+          'script',
           'help', '--help')]$command,
         [string]$name,        
         [switch][alias('force')]$offline,
-        [switch]$noBuild,
+        [switch][alias('no-build')]$noBuild,
         #DBContext, only ever needed if your project has more than one
         [string]$context,
         #The project to use. Defaults to the current working directory.
@@ -41,11 +48,11 @@ param(  [ValidateSet(
         #When adding, also script
         [switch]$script,
         #When adding, also script and use --idempotent
-        [switch]$scriptIdempotent,
+        [switch][alias('idempotent')][alias('script-idempotent')]$scriptIdempotent,
         #When adding, also script and store script in this directory. 
         #Defaults to ./MigrationScripts. Don't use the same directory as the 
         #project's own Migrations directory.
-        [string]$scriptDirectory = "./MigrationScripts",
+        [string][alias('out-dir')]$scriptDirectory,
         #Don't execute just show the command that would be run
         [switch]$dryRun,
         [switch]$help,
@@ -53,23 +60,35 @@ param(  [ValidateSet(
         [switch]$quiet )
 
 
-$selfHelp = ('help', '--help' -eq $command) -or ($null -eq $command -and $help)
-if($selfHelp){get-help $PSCommandPath}
+$selfHelp = ('help', '--help' -eq $command -or -not $command)
 
 $showHelp = ($name -eq "--help") -or $help
 
-$cmdswitches= 
-           ($offline -and ('up','down' -eq $command) ? "--force" : @() ) +
-           ($noBuild ? "--no-build" : @()) +
-           ($context -and -not ('list','script-only' -eq $command) ? @("--context","$context") : @()) +
-           ($project ? "--project","$project" : @()) +
-           ($showHelp ? "--help" : @())
-
-
 $idempotent= $scriptIdempotent ? '--idempotent' : ''
-if( ($script -or $scriptIdempotent) -and -not ('add','script-only' -eq $command) ){
+$doScript = ($command -eq 'script') -or $script -or $scriptIdempotent -or $scriptDirectory
+if( $doScript -and -not ('add','script' -eq $command) ){
   Write-Warning "You asked for script, but only the commands add and script-only are scripted"
 }
+if($doScript -and -not $name){
+  Write-Information "To output to a file, specify both -scriptDirectory and -name"
+  $scriptOut = $null
+} else{
+  $scriptOut = (($scriptDirectory) ? $scriptDirectory : "./MigrationScripts") + "/$name.sql"
+}
+
+
+$cmdswitches= 
+           ($offline -and ('up','down' -eq $command) ? @("--force") : @() ) +
+           ($noBuild ? @("--no-build") : @()) +
+           ($context -and -not ('list','script' -eq $command) ? @("--context","$context") : @()) +
+           ($project ? "--project","$project" : @()) +
+           ($startupProject ? "--startup-project","$startupProject" : @()) +
+           ($showHelp ? @("--help") : @())
+
+$scriptSwitches=           
+           ($scriptIdempotent ? @("--idempotent") : @()) +
+           ($scriptOut ? "-o","$scriptOut" : @())
+
 if($noBuild -and ('add','remove' -eq $command)){
   Write-Warning "Using noBuild with add or remove can result in errors, and break the project build
   if you try to add a duplicate name. If necessary, manually remove errant migrations from the
@@ -90,7 +109,7 @@ switch ($command)
     }    
     go dotnet ef migrations add $name @cmdswitches
     if($doScript){
-      go dotnet ef migrations script $idempotent -o "$scriptDirectory/$name.sql"
+      go dotnet ef migrations script @($cmdswitches + $scriptSwitches)
     }
   }
 
@@ -104,4 +123,11 @@ switch ($command)
     $argss = @( ,$name -ne $null) + $cmdswitches
     go dotnet ef database update @argss
   }
-}
+ 'script' {
+    $rest = $cmdswitches + $scriptSwitches
+    go dotnet ef migrations script @rest
+  }
+  default {
+    get-help $PSCommandPath @args
+  }
+ }
