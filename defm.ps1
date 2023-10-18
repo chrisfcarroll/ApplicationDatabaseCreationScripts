@@ -37,9 +37,11 @@ param(  [ValidateSet(
         [switch][alias('no-build')]$noBuild,
         #DBContext, only ever needed if your project has more than one
         [string]$context,
-        #The project to use. Defaults to the current working directory.
-        [string]$project,
-        #The startup project to use when looking for a context. Defaults to the 
+        #The target project to which the commands will add or remove files. 
+        #Defaults to the current directory.
+        [string][alias('target')]$project,
+        #The startup project is the one the tools will build and run when looking for
+        # a context, a model, or a connectionstring. Defaults to the current directory
         #current working directory.
         [string]$startupProject,
         #The connection string to the database. Defaults to the one specified in 
@@ -50,8 +52,8 @@ param(  [ValidateSet(
         #When adding, also script and use --idempotent
         [switch][alias('idempotent')][alias('script-idempotent')]$scriptIdempotent,
         #When adding, also script and store script in this directory. 
-        #Defaults to ./MigrationScripts. Don't use the same directory as the 
-        #project's own Migrations directory.
+        #Defaults to ./MigrationScripts. Avoid using the same directory as the 
+        #project's own /Migrations/ directory, because that be emptied 
         [string][alias('out-dir')]$scriptDirectory,
         #Don't execute just show the command that would be run
         [switch]$dryRun,
@@ -83,7 +85,8 @@ $cmdswitches=
            ($context -and -not ('list','script' -eq $command) ? @("--context","$context") : @()) +
            ($project ? "--project","$project" : @()) +
            ($startupProject ? "--startup-project","$startupProject" : @()) +
-           ($showHelp ? @("--help") : @())
+           ($showHelp ? @("--help") : @()) +
+           $args
 
 $scriptSwitches=           
            ($scriptIdempotent ? @("--idempotent") : @()) +
